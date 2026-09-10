@@ -327,6 +327,92 @@ local currentTargetStart = 0
 local lastActiveModuleKey = nil
 local lastActiveModuleReason = "none"
 local lastRecommendationReasons = {}
+local SPEC_INFERENCE = {
+    DEATHKNIGHT = {
+        { 1, 55050, 48982, 55233 },
+        { 2, 49184, 49020, 51271 },
+        { 3, 55090, 63560, 85948 },
+    },
+    DRUID = {
+        { 1, 78674, 48505, 2912 },
+        { 2, 5221, 1079, 1822 },
+        { 3, 33917, 33745, 77758 },
+        { 4, 33763, 18562, 48438 },
+    },
+    HUNTER = {
+        { 1, 34026, 19574, 120679 },
+        { 2, 19434, 53209, 120360 },
+        { 3, 53301, 3674, 77767 },
+    },
+    MAGE = {
+        { 1, 30451, 44425, 12051 },
+        { 2, 11366, 11129, 108853 },
+        { 3, 31687, 84714, 30455 },
+    },
+    MONK = {
+        { 1, 121253, 115295, 115069 },
+        { 2, 119611, 124682, 115151 },
+        { 3, 113656, 107428, 100787 },
+    },
+    PALADIN = {
+        { 1, 20473, 53563, 82326 },
+        { 2, 31935, 53600, 53595 },
+        { 3, 85256, 53385, 879 },
+    },
+    PRIEST = {
+        { 1, 47540, 33206, 62618 },
+        { 2, 34861, 88625, 81206 },
+        { 3, 15473, 15407, 8092 },
+    },
+    ROGUE = {
+        { 1, 1329, 32645, 79140 },
+        { 2, 84617, 51690, 13877 },
+        { 3, 51713, 16511, 53 },
+    },
+    SHAMAN = {
+        { 1, 51505, 61882, 117014 },
+        { 2, 17364, 60103, 51533 },
+        { 3, 61295, 974, 73920 },
+    },
+    WARLOCK = {
+        { 1, 103103, 30108, 48181 },
+        { 2, 103958, 105174, 104316 },
+        { 3, 116858, 17962, 108683 },
+    },
+    WARRIOR = {
+        { 1, 12294, 86346, 56636 },
+        { 2, 23881, 85288, 46917 },
+        { 3, 23922, 20243, 12975 },
+    },
+}
+
+local function InferSpecialization(class)
+    if GetSpecialization then
+        local spec = GetSpecialization()
+        if spec then
+            return spec
+        end
+    end
+    if GetPrimaryTalentTree then
+        local spec = GetPrimaryTalentTree()
+        if spec then
+            return spec
+        end
+    end
+
+    local rules = SPEC_INFERENCE[class]
+    if not rules then
+        return nil
+    end
+    for _, rule in ipairs(rules) do
+        for i = 2, #rule do
+            if SpellKnown(rule[i]) then
+                return rule[1]
+            end
+        end
+    end
+    return nil
+end
 local function BuildContext()
     local now = GetTime()
     local energyType = Enum and Enum.PowerType and Enum.PowerType.Energy or 3
@@ -337,10 +423,11 @@ local function BuildContext()
         currentTargetStart = now
     end
 
+    local class = select(2, UnitClass("player"))
     local ctx = {
         now = now,
-        class = select(2, UnitClass("player")),
-        spec = GetSpecialization and GetSpecialization() or nil,
+        class = class,
+        spec = InferSpecialization(class),
         energyType = energyType,
         targetGUID = targetGUID,
         mode = GetMode(),
