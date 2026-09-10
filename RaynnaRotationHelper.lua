@@ -165,10 +165,16 @@ end
 local KEYBIND_SOURCE = [=[
 function()
     local spellID = aura_env.recommendedSpellID
-    if not spellID or not _G.RaynnaRotationHelperGetSpellKeybind then
+    if not spellID then
         return ""
     end
-    return _G.RaynnaRotationHelperGetSpellKeybind(spellID) or ""
+    if _G.RaynnaRotationHelperGetSpellLabel then
+        return _G.RaynnaRotationHelperGetSpellLabel(spellID) or ""
+    end
+    if _G.RaynnaRotationHelperGetSpellKeybind then
+        return _G.RaynnaRotationHelperGetSpellKeybind(spellID) or ""
+    end
+    return ""
 end
 ]=]
 local RESOURCE_TRIGGER_TEMPLATE = [=[
@@ -249,6 +255,66 @@ local function SpellKnown(spellID)
         return GetSpellInfo(spellID) ~= nil
     end
     return false
+end
+
+local GROUND_TARGET_SPELLS = {
+    [5740] = true, -- Rain of Fire
+}
+
+local GROUND_TARGET_DURATIONS = {
+    [5740] = 8,
+}
+
+local groundTargetEffectUntil = {}
+
+local function IsGroundTargetSpell(spellID)
+    return spellID and GROUND_TARGET_SPELLS[spellID] or false
+end
+
+local function IsGroundTargetingSpell(spellID)
+    return IsGroundTargetSpell(spellID) and IsCurrentSpell and IsCurrentSpell(spellID) or false
+end
+
+local function GroundTargetEffectRemaining(spellID)
+    local expires = groundTargetEffectUntil[spellID] or 0
+    return math.max(0, expires - GetTime())
+end
+
+local function MarkGroundTargetSpellCast(spellID)
+    if IsGroundTargetSpell(spellID) then
+        groundTargetEffectUntil[spellID] = GetTime() + (GROUND_TARGET_DURATIONS[spellID] or 8)
+    end
+end
+
+local function ExtractGroundTargetSpellID(...)
+    for i = 1, select("#", ...) do
+        local value = select(i, ...)
+        if type(value) == "number" and IsGroundTargetSpell(value) then
+            return value
+        end
+    end
+    for i = 1, select("#", ...) do
+        local value = select(i, ...)
+        if type(value) == "string" then
+            for spellID in pairs(GROUND_TARGET_SPELLS) do
+                local name = GetSpellInfo(spellID)
+                if name and value == name then
+                    return spellID
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function TrackGroundTargetSpellCast(unit, ...)
+    if unit ~= "player" then
+        return
+    end
+    local spellID = ExtractGroundTargetSpellID(...)
+    if spellID then
+        MarkGroundTargetSpellCast(spellID)
+    end
 end
 
 local RECENT_ATTACKER_WINDOW = 6
@@ -827,6 +893,18 @@ local function BuildContext()
 
     function ctx.readyInRange(spellID, powerCost, powerType)
         return ctx.ready(spellID, powerCost, powerType) and ctx.inRange(spellID)
+    end
+
+    function ctx.groundTargeting(spellID)
+        return IsGroundTargetingSpell(spellID)
+    end
+
+    function ctx.groundEffectRem(spellID)
+        return GroundTargetEffectRemaining(spellID)
+    end
+
+    function ctx.groundReady(spellID, powerCost, powerType)
+        return ctx.ready(spellID, powerCost, powerType) and (ctx.groundTargeting(spellID) or ctx.groundEffectRem(spellID) <= 0)
     end
 
     function ctx.hasAttackTarget()
@@ -1842,7 +1920,7 @@ RegisterRotation("WARLOCK:3", {
         local targetHp = ctx.targetHpPct()
         local darkSoul = ctx.darkSoulActive(113858)
         if enemies >= 3 and embers >= 1 and ctx.buffRem("player", 108683) <= 0 and ctx.ready(108683) then return 108683 end
-        if enemies >= 4 and ctx.ready(5740) then return 5740 end
+        if enemies >= 2 and ctx.groundReady(5740) then return 5740 end
         if enemies >= 2 and ctx.readyInRange(80240) then return 80240 end
         if ctx.debuffRem("target", 348, true) <= 7 and ctx.readyInRange(348) then return 348 end
         if ctx.bossCombat() and embers >= 2 and ctx.ready(113858) then return 113858 end
@@ -3412,6 +3490,20 @@ function _G.RaynnaRotationHelperGetSpellKeybind(spellID)
     return result
 end
 
+function _G.RaynnaRotationHelperGetSpellLabel(spellID)
+    local binding = _G.RaynnaRotationHelperGetSpellKeybind(spellID) or ""
+    if IsGroundTargetSpell(spellID) then
+        if IsGroundTargetingSpell(spellID) then
+            return "PLACE"
+        end
+        if binding ~= "" then
+            return binding .. "\nAREA"
+        end
+        return "AREA"
+    end
+    return binding
+end
+
 _G.RaynnaFeralGetSpellKeybind = _G.RaynnaRotationHelperGetSpellKeybind
 
 local function EnsureFallbackGlow(button)
@@ -3649,6 +3741,7 @@ SafeRegisterEvent("SPELL_UPDATE_COOLDOWN")
 SafeRegisterEvent("UNIT_SPELLCAST_START")
 SafeRegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
 SafeRegisterEvent("UNIT_SPELLCAST_STOP")
+SafeRegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 SafeRegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
 SafeRegisterEvent("UNIT_SPELLCAST_INTERRUPTABLE")
 SafeRegisterEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE")
@@ -3669,6 +3762,9 @@ frame:SetScript("OnEvent", function(_, event, ...)
             WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
         end
         return
+    end
+    if event == "UNIT_SPELLCAST_SUCCEEDED" then
+        TrackGroundTargetSpellCast(...)
     end
     if event == "PLAYER_REGEN_ENABLED" then
         if wipe then
