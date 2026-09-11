@@ -258,10 +258,14 @@ local function SpellKnown(spellID)
 end
 
 local GROUND_TARGET_SPELLS = {
+    [10] = true, -- Blizzard
+    [2120] = true, -- Flamestrike
     [5740] = true, -- Rain of Fire
 }
 
 local GROUND_TARGET_DURATIONS = {
+    [10] = 8,
+    [2120] = 8,
     [5740] = 8,
 }
 
@@ -1236,6 +1240,8 @@ RegisterRotation("MAGE:1", {
         if not ctx.known(7302) and ctx.known(6117) and ctx.buffRem("player", 6117) <= 0 and ctx.ready(6117) then return 6117 end
         if not ctx.hasAttackTarget() then return nil end
         local enemies = ctx.enemyCount()
+        local targetCluster = ctx.clusteredEnemyCount(12)
+        local playerCluster = ctx.nearbyEnemyCount(10)
         local charges = ctx.arcaneCharges()
         local missiles = ctx.buffRem("player", 79683) > 0
 
@@ -1245,9 +1251,10 @@ RegisterRotation("MAGE:1", {
         end
         if ctx.manaPct() < 35 and ctx.ready(12051) then return 12051 end
         if ctx.targetIsBoss() and UnitAffectingCombat and UnitAffectingCombat("player") and ctx.ready(12042) then return 12042 end
-        if enemies >= 5 and charges >= 4 and ctx.ready(44425) and ctx.inRange(44425) then return 44425 end
+        if enemies >= 3 and charges >= 4 and ctx.ready(44425) and ctx.inRange(44425) then return 44425 end
+        if enemies >= 3 and playerCluster >= 3 and ctx.ready(1449) then return 1449 end
+        if enemies >= 3 and targetCluster >= 3 and ctx.groundReady(10) then return 10 end
         if enemies >= 5 and ctx.ready(120) and ctx.inRange(120) then return 120 end
-        if enemies >= 5 and ctx.ready(1449) then return 1449 end
         if charges >= 4 and missiles and ctx.ready(5143) and ctx.inRange(5143) then return 5143 end
         if charges >= 4 and ctx.ready(44425) and ctx.inRange(44425) then return 44425 end
         if missiles and ctx.ready(5143) and ctx.inRange(5143) then return 5143 end
@@ -1280,7 +1287,7 @@ RegisterRotation("MAGE:2", {
         if enemies >= 2 and ctx.ready(108853) and ctx.inRange(108853) then return 108853 end
         if heatingUp and ctx.ready(108853) and ctx.inRange(108853) then return 108853 end
         if enemies >= 4 and ctx.ready(31661) and ctx.inRange(31661) then return 31661 end
-        if enemies >= 4 and ctx.ready(2120) then return 2120 end
+        if enemies >= 3 and ctx.groundReady(2120) then return 2120 end
         if bossTarget and inCombat and ctx.ready(11129) then return 11129 end
         if ctx.ready(2948) and ctx.inRange(2948) and ctx.manaPct() < 20 then return 2948 end
         if ctx.ready(133) and ctx.inRange(133) then return 133 end
@@ -1304,7 +1311,7 @@ RegisterRotation("MAGE:3", {
         if ctx.targetIsBoss() and UnitAffectingCombat and UnitAffectingCombat("player") and ctx.ready(12472) then return 12472 end
         if ctx.ready(84714) and ctx.inRange(84714) then return 84714 end
         if enemies >= 5 and ctx.ready(120) and ctx.inRange(120) then return 120 end
-        if enemies >= 5 and ctx.ready(10) then return 10 end
+        if enemies >= 3 and ctx.groundReady(10) then return 10 end
         if ctx.debuffAnyRem("target", true, 44457, 114923, 112948) <= 3 then
             local bomb = ctx.readyAny(nil, nil, 44457, 114923, 112948)
             if bomb and ctx.inRange(bomb) then return bomb end
