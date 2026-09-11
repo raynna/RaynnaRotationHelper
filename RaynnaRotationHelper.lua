@@ -298,13 +298,29 @@ end
 local GROUND_TARGET_SPELLS = {
     [10] = true, -- Blizzard
     [2120] = true, -- Flamestrike
+    [30283] = true, -- Shadowfury
+    [43265] = true, -- Death and Decay
     [5740] = true, -- Rain of Fire
+    [61882] = true, -- Earthquake
+    [82691] = true, -- Ring of Frost area
+    [102793] = true, -- Ursol's Vortex
+    [113724] = true, -- Ring of Frost
+    [114158] = true, -- Light's Hammer
+    [116844] = true, -- Ring of Peace
 }
 
 local GROUND_TARGET_DURATIONS = {
     [10] = 8,
     [2120] = 8,
+    [30283] = 3,
+    [43265] = 10,
     [5740] = 8,
+    [61882] = 10,
+    [82691] = 10,
+    [102793] = 10,
+    [113724] = 10,
+    [114158] = 16,
+    [116844] = 8,
 }
 
 local groundTargetEffectUntil = {}
@@ -2404,7 +2420,7 @@ local STUN_SPELLS_BY_CLASS = {
     DEATHKNIGHT = { 108194, 115001, 47481 },
     DRUID = { 5211, 22570 },
     HUNTER = { 19577, 19503, 109248 },
-    MAGE = { 44572, 31661 },
+    MAGE = { 44572, 31661, 113724, 82691 },
     MONK = { 119381, 119392, 115078 },
     PALADIN = { 853, 105593, 115750 },
     PRIEST = { 64044, 8122 },
@@ -2417,7 +2433,7 @@ local STUN_SPELLS_BY_CLASS = {
 local CONTROL_SPELLS_BY_CLASS = {
     DRUID = { 33786, 2637 },
     HUNTER = { 19386 },
-    MAGE = { 118 },
+    MAGE = { 118, 113724, 82691 },
     MONK = { 115078 },
     PALADIN = { 20066 },
     PRIEST = { 8122, 64044 },
@@ -3596,7 +3612,15 @@ function _G.RaynnaRotationHelperGetSpellKeybind(spellID)
 end
 
 local function GroundAoeInfo(spellID)
-    spellID = spellID or select(1, ComputeRecommendations())
+    if not spellID then
+        local recommendations = { ComputeRecommendations() }
+        for _, candidate in ipairs(recommendations) do
+            if IsGroundTargetSpell(candidate) then
+                spellID = candidate
+                break
+            end
+        end
+    end
     if not IsGroundTargetSpell(spellID) then
         return nil
     end
