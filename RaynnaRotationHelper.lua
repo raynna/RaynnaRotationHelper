@@ -269,8 +269,14 @@ function(event, ...)
     if not _G.RaynnaRotationHelperGetResourceInfo then
         return false
     end
-    local _, maxCount = _G.RaynnaRotationHelperGetResourceInfo()
-    return maxCount and maxCount >= %%INDEX%%
+    local count, maxCount = _G.RaynnaRotationHelperGetResourceInfo()
+    if not maxCount or maxCount < %%INDEX%% then
+        return false
+    end
+    if UnitExists and UnitExists("target") then
+        return true
+    end
+    return (count or 0) > 0
 end
 ]=]
 
@@ -3253,16 +3259,13 @@ local function RaynnaRotationHelperResourceFadeAnimation(startType)
         colorG = 1,
         alphaFunc = "function(progress, start, delta)\n    return start + (progress * delta)\nend\n",
         use_alpha = true,
-        use_scale = true,
-        scaleType = "straight",
-        scaleFunc = "function(progress, start, delta)\n    return start + (progress * delta)\nend\n",
-        type = "custom",
+        type = startType or "custom",
         easeType = "none",
-        scaley = 0.78,
+        scaley = 1,
         alpha = 0,
         y = 0,
         x = 0,
-        scalex = 0.78,
+        scalex = 1,
         preset = "fade",
         easeStrength = 3,
         rotate = 0,
@@ -3270,13 +3273,28 @@ local function RaynnaRotationHelperResourceFadeAnimation(startType)
         duration_type = "seconds",
     }
     local start = DeepCopy(fade)
-    start.type = startType or "custom"
+    if startType == "custom" then
+        start.use_scale = true
+        start.scaleType = "custom"
+        start.scaleFunc = "function(progress, startX, startY, scaleX, scaleY)\n    progress = tonumber(progress) or 0\n    return 1, math.max(progress, 0.02)\nend\n"
+        start.scalex = 1
+        start.scaley = 1
+    end
+    local finish = DeepCopy(fade)
+    if startType == "custom" then
+        finish.use_scale = true
+        finish.scaleType = "custom"
+        finish.scaleFunc = "function(progress, startX, startY, scaleX, scaleY)\n    progress = tonumber(progress) or 0\n    return 1, math.max(1 - progress, 0.02)\nend\n"
+        finish.scalex = 1
+        finish.scaley = 1
+    end
     return {
         start = start,
         main = { type = "none", easeStrength = 3, duration_type = "seconds", easeType = "none" },
-        finish = DeepCopy(fade),
+        finish = finish,
     }
 end
+
 local function ResourceXOffset(index)
     return (index - 3) * 11
 end
@@ -3346,7 +3364,7 @@ local function BuildResourceGroup(parentId, includeChildren)
         regionType = "group",
         controlledChildren = children,
         internalVersion = 90,
-        xOffset = 0,
+        xOffset = -28,
         yOffset = -58,
         anchorPoint = "CENTER",
         anchorFrameType = "SCREEN",
@@ -3381,14 +3399,16 @@ local function BuildResourceFillAura(parentId, index, forceChild)
         width = 7,
         height = 24,
         xOffset = ResourceXOffset(index),
-        yOffset = 0,
-        anchorPoint = "CENTER",
+        yOffset = -14,
+        anchorPoint = "BOTTOM",
         anchorFrameType = "SCREEN",
-        selfPoint = "CENTER",
+        selfPoint = "BOTTOM",
         frameStrata = 4,
         alpha = 1,
         color = ResourceColor(resource),
         rotate = false,
+        scalex = 1,
+        scaley = 1,
         internalVersion = 90,
         load = GenericLoad(),
         triggers = {
@@ -3430,6 +3450,8 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
         frameStrata = 2,
         alpha = 1,
         color = { 0.035, 0.04, 0.05, 0.58 },
+        scalex = 1,
+        scaley = 1,
         internalVersion = 90,
         load = GenericLoad(),
         triggers = {
@@ -3453,9 +3475,12 @@ end
 local function BuildResourceGcdAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_GCD_IDS[index] or TARGET_ID
+    local resource = select(3, ComputeResourceInfo())
+    local borderColor = ResourceColor(resource)
+    borderColor[4] = 0.32
     return {
         id = id,
-        uid = "raynna-rotation-resource-glow-" .. index,
+        uid = "raynna-rotation-resource-border-" .. index,
         parent = parentId,
         regionType = "texture",
         texture = "Interface\\Buttons\\WHITE8X8",
@@ -3468,20 +3493,22 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
         anchorPoint = "CENTER",
         anchorFrameType = "SCREEN",
         selfPoint = "CENTER",
-        frameStrata = 5,
-        alpha = 0.35,
-        color = { 1, 0.88, 0.22, 0.45 },
+        frameStrata = 3,
+        alpha = 0.42,
+        color = borderColor,
+        scalex = 1,
+        scaley = 1,
         internalVersion = 90,
         load = GenericLoad(),
         triggers = {
             {
-                trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
+                trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
                 untrigger = {},
             },
-            disjunctive = "all",
+            disjunctive = "any",
             activeTriggerMode = -10,
         },
-        animation = RaynnaRotationHelperResourceFadeAnimation("custom"),
+        animation = RaynnaRotationHelperResourceFadeAnimation("none"),
         actions = { start = {}, init = {}, finish = {} },
         conditions = {},
         subRegions = {},
