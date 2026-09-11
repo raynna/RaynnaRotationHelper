@@ -3275,7 +3275,24 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
     FinalizeResourceClone(data, id, "raynna-rotation-cp-yellow-gcd-" .. index, parentId)
     data.triggers = {
         {
-            trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.05, custom = RESOURCE_GCD_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), debuffType = "HELPFUL" },
+            trigger = {
+                type = "spell",
+                event = "Global Cooldown",
+                unit = "player",
+                use_unit = true,
+                unevent = "auto",
+                duration = "1",
+                use_inverse = false,
+                names = {},
+                spellIds = {},
+                subeventPrefix = "SPELL",
+                subeventSuffix = "_CAST_START",
+                debuffType = "HELPFUL",
+            },
+            untrigger = {},
+        },
+        {
+            trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), debuffType = "HELPFUL" },
             untrigger = {},
         },
         disjunctive = "all",
