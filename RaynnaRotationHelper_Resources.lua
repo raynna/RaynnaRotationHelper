@@ -256,9 +256,9 @@ local function WeakAuraRegion(id)
     return _G["WeakAuras:" .. id]
 end
 
-local RESOURCE_FILL_FULL_HEIGHT = 24
+local RESOURCE_FILL_FULL_HEIGHT = 28
 local RESOURCE_FILL_EMPTY_HEIGHT = 0.5
-local RESOURCE_FILL_SPEED = 150
+local RESOURCE_FILL_SPEED = 70
 local RESOURCE_MAX_FLASH_SECONDS = 0.55
 local resourceFillHeights = {}
 local lastResourceCount = 0
@@ -309,7 +309,7 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
         local fill = WeakAuraRegion(RESOURCE_IDS[i])
         local target = (i <= count) and RESOURCE_FILL_FULL_HEIGHT or RESOURCE_FILL_EMPTY_HEIGHT
         local current = resourceFillHeights[i]
-        if current == nil then current = target end
+        if current == nil then current = RESOURCE_FILL_EMPTY_HEIGHT end
         local step = RESOURCE_FILL_SPEED * elapsed
         if current < target then
             current = math.min(target, current + step)
