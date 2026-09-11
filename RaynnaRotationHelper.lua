@@ -2969,6 +2969,7 @@ local function BuildGroup(includeChildren)
         uid = "raynna-rotation-helper-group",
         regionType = "group",
         controlledChildren = children,
+        internalVersion = 90,
         xOffset = 0,
         yOffset = -120,
         anchorPoint = "CENTER",
@@ -3293,6 +3294,7 @@ local function ResourceFallbackGroup(parentId, includeChildren)
         parent = parentId,
         regionType = "group",
         controlledChildren = children,
+        internalVersion = 90,
         xOffset = -320.7607084057289,
         yOffset = 163.3597575043273,
         anchorPoint = "CENTER",
@@ -3317,6 +3319,7 @@ local function FinalizeResourceClone(data, id, uid, parentId)
     data.id = id
     data.uid = uid
     data.parent = parentId
+    data.internalVersion = 90
     data.load = GenericLoad()
     data.wagoID = nil
     data.url = nil
@@ -3494,14 +3497,14 @@ end
 
 local SafeWeakAurasAdd
 local function InstallResourcePips(parentId)
-    SafeWeakAurasAdd(BuildResourceGroup(parentId, true))
+    SafeWeakAurasAdd(BuildResourceGroup(parentId, false))
     for i = 1, #RESOURCE_IDS do
         SafeWeakAurasAdd(BuildResourceFillAura(RESOURCE_GROUP_ID, i, true))
         SafeWeakAurasAdd(BuildResourceBlackOutlineAura(RESOURCE_GROUP_ID, i, true))
         SafeWeakAurasAdd(BuildResourceGcdAura(RESOURCE_GROUP_ID, i, true))
     end
-end
-local function ClearGeneratedAuraData()
+    SafeWeakAurasAdd(BuildResourceGroup(parentId, true))
+endlocal function ClearGeneratedAuraData()
     WeakAurasSaved.displays[CHILD_ID] = nil
     WeakAurasSaved.displays[ALT_CHILD_ID] = nil
     WeakAurasSaved.displays[DEFENSIVE_CHILD_ID] = nil
