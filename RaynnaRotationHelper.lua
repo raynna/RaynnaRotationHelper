@@ -363,13 +363,57 @@ local GROUND_TARGET_DURATIONS = {
 }
 
 local groundTargetEffectUntil = {}
+local activeGroundTargetSpellID
+local activeGroundTargetSpellAt = 0
 
 local function IsGroundTargetSpell(spellID)
     return spellID and GROUND_TARGET_SPELLS[spellID] or false
 end
 
+local function RememberGroundTargetSpell(spellID)
+    if IsGroundTargetSpell(spellID) then
+        activeGroundTargetSpellID = spellID
+        activeGroundTargetSpellAt = GetTime()
+    end
+end
+
+local function GroundTargetSpellIDFromName(spellName)
+    if not spellName then
+        return nil
+    end
+    for spellID in pairs(GROUND_TARGET_SPELLS) do
+        local name = GetSpellInfo(spellID)
+        if name and name == spellName then
+            return spellID
+        end
+    end
+    return nil
+end
+
+local function ActiveGroundTargetSpellID()
+    if IsCurrentSpell then
+        for spellID in pairs(GROUND_TARGET_SPELLS) do
+            if IsCurrentSpell(spellID) then
+                RememberGroundTargetSpell(spellID)
+                return spellID
+            end
+        end
+    end
+    if SpellIsTargeting and SpellIsTargeting() and activeGroundTargetSpellID and GetTime() - activeGroundTargetSpellAt <= 12 then
+        return activeGroundTargetSpellID
+    end
+    return nil
+end
+
 local function IsGroundTargetingSpell(spellID)
-    return IsGroundTargetSpell(spellID) and IsCurrentSpell and IsCurrentSpell(spellID) or false
+    if not IsGroundTargetSpell(spellID) then
+        return false
+    end
+    if IsCurrentSpell and IsCurrentSpell(spellID) then
+        RememberGroundTargetSpell(spellID)
+        return true
+    end
+    return SpellIsTargeting and SpellIsTargeting() and ActiveGroundTargetSpellID() == spellID or false
 end
 
 local function GroundTargetEffectRemaining(spellID)
@@ -379,6 +423,7 @@ end
 
 local function MarkGroundTargetSpellCast(spellID)
     if IsGroundTargetSpell(spellID) then
+        RememberGroundTargetSpell(spellID)
         groundTargetEffectUntil[spellID] = GetTime() + (GROUND_TARGET_DURATIONS[spellID] or 8)
     end
 end
@@ -414,6 +459,43 @@ local function TrackGroundTargetSpellCast(unit, ...)
     end
 end
 
+local groundTargetHooksInstalled = false
+local function SafeHookGlobal(name, handler)
+    if hooksecurefunc and _G[name] then
+        pcall(hooksecurefunc, name, handler)
+    end
+end
+
+local function InstallGroundTargetHooks()
+    if groundTargetHooksInstalled then
+        return
+    end
+    groundTargetHooksInstalled = true
+    SafeHookGlobal("UseAction", function(slot)
+        if not GetActionInfo then
+            return
+        end
+        local actionType, id = GetActionInfo(slot)
+        if actionType == "spell" then
+            RememberGroundTargetSpell(id)
+        elseif actionType == "macro" and GetMacroSpell then
+            local spellName, _, spellID = GetMacroSpell(id)
+            RememberGroundTargetSpell(spellID or GroundTargetSpellIDFromName(spellName))
+        end
+    end)
+    SafeHookGlobal("CastSpellByID", function(spellID)
+        RememberGroundTargetSpell(spellID)
+    end)
+    SafeHookGlobal("CastSpellByName", function(spellName)
+        RememberGroundTargetSpell(GroundTargetSpellIDFromName(spellName))
+    end)
+    SafeHookGlobal("CastSpell", function(spellBookID, bookType)
+        if GetSpellBookItemInfo then
+            local _, spellID = GetSpellBookItemInfo(spellBookID, bookType)
+            RememberGroundTargetSpell(spellID)
+        end
+    end)
+end
 local RECENT_ATTACKER_WINDOW = 6
 local recentHostileAttackers = {}
 local recentMeleeAttackers = {}
@@ -3793,6 +3875,9 @@ local function GroundAoeInfo(spellID)
         return nil
     end
     if not spellID then
+        spellID = ActiveGroundTargetSpellID()
+    end
+    if not spellID then
         local recommendations = { ComputeRecommendations() }
         for _, candidate in ipairs(recommendations) do
             if IsGroundTargetSpell(candidate) then
@@ -4271,6 +4356,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end
     local unit = ...
     if event == "PLAYER_LOGIN" then
+        InstallGroundTargetHooks()
         CreateOptionsPanel()
         C_Timer.After(1, Install)
         return
