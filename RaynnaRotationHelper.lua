@@ -363,44 +363,38 @@ local GROUND_TARGET_DURATIONS = {
 }
 
 local groundTargetEffectUntil = {}
-local activeGroundTargetSpellID
-local activeGroundTargetSpellAt = 0
 
 local function IsGroundTargetSpell(spellID)
     return spellID and GROUND_TARGET_SPELLS[spellID] or false
 end
 
-local function RememberGroundTargetSpell(spellID)
+function RaynnaRotationHelperRememberGroundTargetSpell(spellID)
     if IsGroundTargetSpell(spellID) then
-        activeGroundTargetSpellID = spellID
-        activeGroundTargetSpellAt = GetTime()
+        groundTargetEffectUntil.activeSpellID = spellID
+        groundTargetEffectUntil.activeSpellAt = GetTime()
     end
 end
 
-local function GroundTargetSpellIDFromName(spellName)
-    if not spellName then
-        return nil
-    end
-    for spellID in pairs(GROUND_TARGET_SPELLS) do
-        local name = GetSpellInfo(spellID)
-        if name and name == spellName then
-            return spellID
-        end
-    end
-    return nil
-end
-
-local function ActiveGroundTargetSpellID()
-    if IsCurrentSpell then
+function RaynnaRotationHelperActiveGroundTargetSpellID(spellName)
+    if spellName then
         for spellID in pairs(GROUND_TARGET_SPELLS) do
-            if IsCurrentSpell(spellID) then
-                RememberGroundTargetSpell(spellID)
+            local name = GetSpellInfo(spellID)
+            if name and name == spellName then
+                RaynnaRotationHelperRememberGroundTargetSpell(spellID)
                 return spellID
             end
         end
     end
-    if SpellIsTargeting and SpellIsTargeting() and activeGroundTargetSpellID and GetTime() - activeGroundTargetSpellAt <= 12 then
-        return activeGroundTargetSpellID
+    if IsCurrentSpell then
+        for spellID in pairs(GROUND_TARGET_SPELLS) do
+            if IsCurrentSpell(spellID) then
+                RaynnaRotationHelperRememberGroundTargetSpell(spellID)
+                return spellID
+            end
+        end
+    end
+    if SpellIsTargeting and SpellIsTargeting() and groundTargetEffectUntil.activeSpellID and GetTime() - (groundTargetEffectUntil.activeSpellAt or 0) <= 12 then
+        return groundTargetEffectUntil.activeSpellID
     end
     return nil
 end
@@ -410,10 +404,10 @@ local function IsGroundTargetingSpell(spellID)
         return false
     end
     if IsCurrentSpell and IsCurrentSpell(spellID) then
-        RememberGroundTargetSpell(spellID)
+        RaynnaRotationHelperRememberGroundTargetSpell(spellID)
         return true
     end
-    return SpellIsTargeting and SpellIsTargeting() and ActiveGroundTargetSpellID() == spellID or false
+    return SpellIsTargeting and SpellIsTargeting() and RaynnaRotationHelperActiveGroundTargetSpellID() == spellID or false
 end
 
 local function GroundTargetEffectRemaining(spellID)
@@ -423,7 +417,7 @@ end
 
 local function MarkGroundTargetSpellCast(spellID)
     if IsGroundTargetSpell(spellID) then
-        RememberGroundTargetSpell(spellID)
+        RaynnaRotationHelperRememberGroundTargetSpell(spellID)
         groundTargetEffectUntil[spellID] = GetTime() + (GROUND_TARGET_DURATIONS[spellID] or 8)
     end
 end
@@ -459,40 +453,38 @@ local function TrackGroundTargetSpellCast(unit, ...)
     end
 end
 
-local groundTargetHooksInstalled = false
-local function SafeHookGlobal(name, handler)
-    if hooksecurefunc and _G[name] then
-        pcall(hooksecurefunc, name, handler)
-    end
-end
-
-local function InstallGroundTargetHooks()
-    if groundTargetHooksInstalled then
+function RaynnaRotationHelperInstallGroundTargetHooks()
+    if groundTargetEffectUntil.hooksInstalled then
         return
     end
-    groundTargetHooksInstalled = true
-    SafeHookGlobal("UseAction", function(slot)
+    groundTargetEffectUntil.hooksInstalled = true
+    local function safeHookGlobal(name, handler)
+        if hooksecurefunc and _G[name] then
+            pcall(hooksecurefunc, name, handler)
+        end
+    end
+    safeHookGlobal("UseAction", function(slot)
         if not GetActionInfo then
             return
         end
         local actionType, id = GetActionInfo(slot)
         if actionType == "spell" then
-            RememberGroundTargetSpell(id)
+            RaynnaRotationHelperRememberGroundTargetSpell(id)
         elseif actionType == "macro" and GetMacroSpell then
             local spellName, _, spellID = GetMacroSpell(id)
-            RememberGroundTargetSpell(spellID or GroundTargetSpellIDFromName(spellName))
+            RaynnaRotationHelperRememberGroundTargetSpell(spellID or RaynnaRotationHelperActiveGroundTargetSpellID(spellName))
         end
     end)
-    SafeHookGlobal("CastSpellByID", function(spellID)
-        RememberGroundTargetSpell(spellID)
+    safeHookGlobal("CastSpellByID", function(spellID)
+        RaynnaRotationHelperRememberGroundTargetSpell(spellID)
     end)
-    SafeHookGlobal("CastSpellByName", function(spellName)
-        RememberGroundTargetSpell(GroundTargetSpellIDFromName(spellName))
+    safeHookGlobal("CastSpellByName", function(spellName)
+        RaynnaRotationHelperRememberGroundTargetSpell(RaynnaRotationHelperActiveGroundTargetSpellID(spellName))
     end)
-    SafeHookGlobal("CastSpell", function(spellBookID, bookType)
+    safeHookGlobal("CastSpell", function(spellBookID, bookType)
         if GetSpellBookItemInfo then
             local _, spellID = GetSpellBookItemInfo(spellBookID, bookType)
-            RememberGroundTargetSpell(spellID)
+            RaynnaRotationHelperRememberGroundTargetSpell(spellID)
         end
     end)
 end
@@ -3875,7 +3867,7 @@ local function GroundAoeInfo(spellID)
         return nil
     end
     if not spellID then
-        spellID = ActiveGroundTargetSpellID()
+        spellID = RaynnaRotationHelperActiveGroundTargetSpellID()
     end
     if not spellID then
         local recommendations = { ComputeRecommendations() }
@@ -4356,7 +4348,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end
     local unit = ...
     if event == "PLAYER_LOGIN" then
-        InstallGroundTargetHooks()
+        RaynnaRotationHelperInstallGroundTargetHooks()
         CreateOptionsPanel()
         C_Timer.After(1, Install)
         return
