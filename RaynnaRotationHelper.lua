@@ -22,8 +22,8 @@ local GROUND_AOE_COLORS = {
     GOOD = { 1, 0.88, 0.12, 1 },
     BEST = { 0.12, 0.9, 0.28, 1 },
 }
-local OLD_RESOURCE_GROUP_ID = TARGET_ID .. " - Druid Combo points"
-local RESOURCE_GROUP_ID = TARGET_ID .. " - Resource Pips"
+local OLD_RESOURCE_GROUP_IDS = { TARGET_ID .. " - Resource Pips", TARGET_ID .. " - Druid Combo points" }
+local RESOURCE_GROUP_ID = "Raynna's Pips"
 local RESOURCE_IDS = {}
 local RESOURCE_OUTLINE_IDS = {}
 local RESOURCE_GCD_IDS = {}
@@ -40,7 +40,8 @@ local ACTION_UIDS = {
     [5] = "raynna-rotation-interrupt-action",
     [6] = "raynna-rotation-pet-action",
     [7] = "raynna-rotation-utility-action",
-}local GROUND_AOE_INDICATOR_UIDS = {
+}
+local GROUND_AOE_INDICATOR_UIDS = {
     BAD = "raynna-rotation-ground-aoe-bad",
     OK = "raynna-rotation-ground-aoe-ok",
     GOOD = "raynna-rotation-ground-aoe-good",
@@ -3083,10 +3084,6 @@ local RESOURCE_COLORS = {
     DEMONIC_FURY = { 0.58, 0.12, 0.9, 1 },
 }
 
-local LEGACY_RESOURCE_GROUP_ID = "Druid Combo points"
-local LEGACY_RESOURCE_FILL_IDS = { "CP 1", "CP 2", "CP 3", "CP 4", "CP 5" }
-local LEGACY_RESOURCE_OUTLINE_IDS = { "CP1BlackOutline", "CP2BlackOutline", "CP3BlackOutline", "CP4BlackOutline", "CP5BlackOutline" }
-local LEGACY_RESOURCE_GCD_IDS = { "CP1YellowOutline GCD", "CP2YellowOutline GCD", "CP3YellowOutline GCD", "CP4YellowOutline GCD", "CP5YellowOutline GCD" }
 
 local function ResourceColor(resource)
     local color = RESOURCE_COLORS[resource or ""] or { 1, 1, 1, 1 }
@@ -3166,28 +3163,13 @@ local function FinalizeResourceClone(data, id, uid, parentId)
 end
 
 local function BuildResourceGroup(parentId, includeChildren)
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[LEGACY_RESOURCE_GROUP_ID]
-    if not source then
-        return ResourceFallbackGroup(parentId, includeChildren)
-    end
-    local data = DeepCopy(source)
-    local children = {}
-    if includeChildren then
-        for i = 1, #RESOURCE_IDS do table.insert(children, RESOURCE_IDS[i]) end
-        for i = 1, #RESOURCE_OUTLINE_IDS do table.insert(children, RESOURCE_OUTLINE_IDS[i]) end
-        for i = 1, #RESOURCE_GCD_IDS do table.insert(children, RESOURCE_GCD_IDS[i]) end
-    end
-    FinalizeResourceClone(data, RESOURCE_GROUP_ID, "raynna-rotation-resource-group", parentId)
-    data.controlledChildren = children
-    data.sortHybridTable = nil
-    return data
+    return ResourceFallbackGroup(parentId, includeChildren)
 end
 
 local function BuildResourceFillAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_IDS[index] or TARGET_ID
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[LEGACY_RESOURCE_FILL_IDS[index]]
-    local data = source and DeepCopy(source) or {
+    local data = {
         regionType = "texture",
         texture = "Interface\\AddOns\\WeakAuras\\Media\\Textures\\Circle_Smooth_Border",
         textureWrapMode = "CLAMP",
@@ -3220,8 +3202,7 @@ end
 local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_OUTLINE_IDS[index] or TARGET_ID
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[LEGACY_RESOURCE_OUTLINE_IDS[index]]
-    local data = source and DeepCopy(source) or {
+    local data = {
         regionType = "texture",
         texture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
         textureWrapMode = "CLAMP",
@@ -3253,8 +3234,7 @@ end
 local function BuildResourceGcdAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_GCD_IDS[index] or TARGET_ID
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[LEGACY_RESOURCE_GCD_IDS[index]]
-    local data = source and DeepCopy(source) or {
+    local data = {
         regionType = "progresstexture",
         texture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
         foregroundTexture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
@@ -3330,7 +3310,13 @@ local function ClearGeneratedAuraData()
         WeakAurasSaved.displays[TARGET_ID .. " - Resource Outline " .. i] = nil
     end
     WeakAurasSaved.displays[RESOURCE_GROUP_ID] = nil
-    WeakAurasSaved.displays[OLD_RESOURCE_GROUP_ID] = nil
+    for _, oldGroupId in ipairs(OLD_RESOURCE_GROUP_IDS) do
+        WeakAurasSaved.displays[oldGroupId] = nil
+    end
+    local legacyPips = WeakAurasSaved.displays["Druid Combo points"]
+    if legacyPips and (legacyPips.parent == TARGET_ID or legacyPips.parent == RESOURCE_GROUP_ID) then
+        legacyPips.parent = nil
+    end
     WeakAurasSaved.displays[TARGET_ID] = nil
 end
 
@@ -3411,7 +3397,7 @@ local function PatchLegacyFeralGroup(group)
     RemoveChild(group.controlledChildren, UTILITY_CHILD_ID)
     for _, quality in ipairs(GROUND_AOE_QUALITIES) do RemoveChild(group.controlledChildren, GROUND_AOE_INDICATOR_IDS[quality]) end
     RemoveChild(group.controlledChildren, RESOURCE_GROUP_ID)
-    RemoveChild(group.controlledChildren, OLD_RESOURCE_GROUP_ID)
+    for _, oldGroupId in ipairs(OLD_RESOURCE_GROUP_IDS) do RemoveChild(group.controlledChildren, oldGroupId) end
     AddExistingChild(group.controlledChildren, "Druid Combo points")
     AddExistingChild(group.controlledChildren, "Cooldowns")
     AddExistingChild(group.controlledChildren, "Highlight")
@@ -3425,7 +3411,7 @@ local function PatchLegacyFeralGroup(group)
     group.sortHybridTable[PET_CHILD_ID] = nil
     group.sortHybridTable[UTILITY_CHILD_ID] = nil
     group.sortHybridTable[RESOURCE_GROUP_ID] = nil
-    group.sortHybridTable[OLD_RESOURCE_GROUP_ID] = nil
+    for _, oldGroupId in ipairs(OLD_RESOURCE_GROUP_IDS) do group.sortHybridTable[oldGroupId] = nil end
     for _, quality in ipairs(GROUND_AOE_QUALITIES) do group.sortHybridTable[GROUND_AOE_INDICATOR_IDS[quality]] = nil end
 
     local descendants = {}
