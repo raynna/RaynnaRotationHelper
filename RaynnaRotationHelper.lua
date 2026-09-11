@@ -254,42 +254,6 @@ function()
     return ""
 end
 ]=]
-local RESOURCE_TRIGGER_TEMPLATE = [=[
-function(event, ...)
-    if not _G.RaynnaRotationHelperGetResourceInfo then
-        return false
-    end
-    local count, maxCount = _G.RaynnaRotationHelperGetResourceInfo()
-    return maxCount and maxCount >= %%INDEX%% and count and count >= %%INDEX%%
-end
-]=]
-
-local RESOURCE_SLOT_TRIGGER_TEMPLATE = [=[
-function(event, ...)
-    if not _G.RaynnaRotationHelperGetResourceInfo then
-        return false
-    end
-    local count, maxCount = _G.RaynnaRotationHelperGetResourceInfo()
-    if not maxCount or maxCount < %%INDEX%% then
-        return false
-    end
-    if UnitExists and UnitExists("target") then
-        return true
-    end
-    return (count or 0) >= %%INDEX%%
-end
-]=]
-
-local RESOURCE_ICON_SOURCE = [=[
-function()
-    if not _G.RaynnaRotationHelperGetResourceInfo then
-        return 134400
-    end
-    local _, _, _, icon = _G.RaynnaRotationHelperGetResourceInfo()
-    return icon or 134400
-end
-]=]
-
 local function SafeFindAuraBySpellID(unit, spellID, filter, caster)
     if not UnitAura then
         return nil
@@ -3212,322 +3176,6 @@ local function ClearGeneratedTextFields(id)
 end
 
 
-local RESOURCE_COLORS = {
-    COMBO_POINTS = { 1, 0.090196080505848, 0, 1 },
-    ARCANE_CHARGES = { 0.58, 0.2, 1, 1 },
-    HOLY_POWER = { 1, 0.82, 0.18, 1 },
-    CHI = { 0.1, 0.95, 0.55, 1 },
-    SHADOW_ORBS = { 0.62, 0.22, 0.92, 1 },
-    SOUL_SHARDS = { 0.55, 0.85, 1, 1 },
-    BURNING_EMBERS = { 1, 0.34, 0.08, 1 },
-    DEMONIC_FURY = { 0.58, 0.12, 0.9, 1 },
-}
-
-
-local function ResourceColor(resource)
-    local color = RESOURCE_COLORS[resource or ""] or { 1, 1, 1, 1 }
-    return { color[1], color[2], color[3], color[4] }
-end
-
-local function GenericLoad()
-    return { use_petbattle = false, use_vehicleUi = false, use_never = false, class = { multi = {} }, class_and_spec = { multi = {} }, talent = { multi = {} }, spec = { multi = {} }, size = { multi = {} } }
-end
-
-local function DeepCopy(value, seen)
-    if type(value) ~= "table" then
-        return value
-    end
-    seen = seen or {}
-    if seen[value] then
-        return seen[value]
-    end
-    local copy = {}
-    seen[value] = copy
-    for key, item in pairs(value) do
-        copy[DeepCopy(key, seen)] = DeepCopy(item, seen)
-    end
-    return copy
-end
-
-
-local function RaynnaRotationHelperResourceFadeAnimation(startType)
-    local fade = {
-        colorR = 1,
-        duration = "0.16",
-        alphaType = "straight",
-        colorA = 1,
-        colorG = 1,
-        alphaFunc = "function(progress, start, delta)\n    return start + (progress * delta)\nend\n",
-        use_alpha = true,
-        type = startType or "custom",
-        easeType = "none",
-        scaley = 1,
-        alpha = 0,
-        y = 0,
-        x = 0,
-        scalex = 1,
-        preset = "fade",
-        easeStrength = 3,
-        rotate = 0,
-        colorB = 1,
-        duration_type = "seconds",
-    }
-    local start = DeepCopy(fade)
-    if startType == "custom" then
-        start.use_scale = true
-        start.scaleType = "custom"
-        start.scaleFunc = "function(progress, startX, startY, scaleX, scaleY)\n    progress = tonumber(progress) or 0\n    return 1, math.max(progress, 0.02)\nend\n"
-        start.scalex = 1
-        start.scaley = 1
-    end
-    local finish = DeepCopy(fade)
-    if startType == "custom" then
-        finish.use_scale = true
-        finish.scaleType = "custom"
-        finish.scaleFunc = "function(progress, startX, startY, scaleX, scaleY)\n    progress = tonumber(progress) or 0\n    return 1, math.max(1 - progress, 0.02)\nend\n"
-        finish.scalex = 1
-        finish.scaley = 1
-    end
-    return {
-        start = start,
-        main = { type = "none", easeStrength = 3, duration_type = "seconds", easeType = "none" },
-        finish = finish,
-    }
-end
-
-local function ResourceXOffset(index)
-    return (index - 3) * 11
-end
-
-local function ResourceFallbackGroup(parentId, includeChildren)
-    local children = {}
-    if includeChildren then
-        for i = 1, #RESOURCE_IDS do table.insert(children, RESOURCE_IDS[i]) end
-        for i = 1, #RESOURCE_OUTLINE_IDS do table.insert(children, RESOURCE_OUTLINE_IDS[i]) end
-        for i = 1, #RESOURCE_GCD_IDS do table.insert(children, RESOURCE_GCD_IDS[i]) end
-    end
-    return {
-        id = RESOURCE_GROUP_ID,
-        uid = "raynna-rotation-resource-group",
-        parent = parentId,
-        regionType = "group",
-        controlledChildren = children,
-        internalVersion = 90,
-        xOffset = -320.7607084057289,
-        yOffset = 163.3597575043273,
-        anchorPoint = "CENTER",
-        anchorFrameType = "SCREEN",
-        selfPoint = "CENTER",
-        frameStrata = 1,
-        alpha = 1,
-        scale = 0.55,
-        load = GenericLoad(),
-        triggers = { { trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
-        animation = { start = { type = "none" }, main = { type = "none" }, finish = { type = "none" } },
-        actions = { start = {}, init = {}, finish = {} },
-        conditions = {},
-        subRegions = {},
-        config = {},
-        authorOptions = {},
-        information = { showNilIsFalse = true, groupOffset = true, forceEvents = true, ignoreOptionsEventErrors = true },
-    }
-end
-
-local function FinalizeResourceClone(data, id, uid, parentId)
-    data.id = id
-    data.uid = uid
-    data.parent = parentId
-    data.internalVersion = 90
-    data.load = GenericLoad()
-    data.wagoID = nil
-    data.url = nil
-    data.semver = nil
-    data.version = nil
-    data.tocversion = nil
-    data.source = nil
-    data.desc = nil
-    data.preferToUpdate = false
-    return data
-end
-
-local function BuildResourceGroup(parentId, includeChildren)
-    local children = {}
-    if includeChildren then
-        for i = 1, #RESOURCE_OUTLINE_IDS do table.insert(children, RESOURCE_OUTLINE_IDS[i]) end
-        for i = 1, #RESOURCE_IDS do table.insert(children, RESOURCE_IDS[i]) end
-        for i = 1, #RESOURCE_GCD_IDS do table.insert(children, RESOURCE_GCD_IDS[i]) end
-    end
-    return {
-        id = RESOURCE_GROUP_ID,
-        uid = "raynna-rotation-resource-group",
-        parent = parentId,
-        regionType = "group",
-        controlledChildren = children,
-        internalVersion = 90,
-        xOffset = -28,
-        yOffset = -58,
-        anchorPoint = "CENTER",
-        anchorFrameType = "SCREEN",
-        selfPoint = "CENTER",
-        frameStrata = 1,
-        alpha = 1,
-        scale = 1,
-        load = GenericLoad(),
-        triggers = { { trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
-        animation = { start = { type = "none" }, main = { type = "none" }, finish = { type = "none" } },
-        actions = { start = {}, init = {}, finish = {} },
-        conditions = {},
-        subRegions = {},
-        config = {},
-        authorOptions = {},
-        information = { showNilIsFalse = true, groupOffset = true, forceEvents = true, ignoreOptionsEventErrors = true },
-    }
-end
-
-local function BuildResourceFillAura(parentId, index, forceChild)
-    local childMode = parentId or forceChild
-    local id = childMode and RESOURCE_IDS[index] or TARGET_ID
-    local resource = select(3, ComputeResourceInfo())
-    return {
-        id = id,
-        uid = "raynna-rotation-resource-fill-" .. index,
-        parent = parentId,
-        regionType = "texture",
-        texture = "Interface\\Buttons\\WHITE8X8",
-        textureWrapMode = "CLAMP",
-        blendMode = "BLEND",
-        width = 7,
-        height = 1,
-        xOffset = ResourceXOffset(index),
-        yOffset = -14,
-        anchorPoint = "BOTTOM",
-        anchorFrameType = "SCREEN",
-        selfPoint = "BOTTOM",
-        frameStrata = 4,
-        alpha = 0,
-        color = ResourceColor(resource),
-        rotate = false,
-        scalex = 1,
-        scaley = 1,
-        internalVersion = 90,
-        load = GenericLoad(),
-        triggers = {
-            {
-                trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
-                untrigger = {},
-            },
-            disjunctive = "all",
-            activeTriggerMode = -10,
-        },
-        animation = RaynnaRotationHelperResourceFadeAnimation("none"),
-        actions = { start = {}, init = {}, finish = {} },
-        conditions = {},
-        subRegions = { { type = "subbackground" } },
-        config = {},
-        authorOptions = {},
-        information = { showNilIsFalse = true, forceEvents = true, ignoreOptionsEventErrors = true },
-    }
-end
-
-local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
-    local childMode = parentId or forceChild
-    local id = childMode and RESOURCE_OUTLINE_IDS[index] or TARGET_ID
-    return {
-        id = id,
-        uid = "raynna-rotation-resource-bg-" .. index,
-        parent = parentId,
-        regionType = "texture",
-        texture = "Interface\\Buttons\\WHITE8X8",
-        textureWrapMode = "CLAMP",
-        blendMode = "BLEND",
-        width = 9,
-        height = 28,
-        xOffset = ResourceXOffset(index),
-        yOffset = 0,
-        anchorPoint = "CENTER",
-        anchorFrameType = "SCREEN",
-        selfPoint = "CENTER",
-        frameStrata = 2,
-        alpha = 1,
-        color = { 0.035, 0.04, 0.05, 0.58 },
-        scalex = 1,
-        scaley = 1,
-        internalVersion = 90,
-        load = GenericLoad(),
-        triggers = {
-            {
-                trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
-                untrigger = {},
-            },
-            disjunctive = "any",
-            activeTriggerMode = -10,
-        },
-        animation = RaynnaRotationHelperResourceFadeAnimation("none"),
-        actions = { start = {}, init = {}, finish = {} },
-        conditions = {},
-        subRegions = { { type = "subbackground" } },
-        config = {},
-        authorOptions = {},
-        information = { showNilIsFalse = true, forceEvents = true, ignoreOptionsEventErrors = true },
-    }
-end
-
-local function BuildResourceGcdAura(parentId, index, forceChild)
-    local childMode = parentId or forceChild
-    local id = childMode and RESOURCE_GCD_IDS[index] or TARGET_ID
-    local resource = select(3, ComputeResourceInfo())
-    local borderColor = ResourceColor(resource)
-    borderColor[4] = 0.32
-    return {
-        id = id,
-        uid = "raynna-rotation-resource-border-" .. index,
-        parent = parentId,
-        regionType = "texture",
-        texture = "Interface\\Buttons\\WHITE8X8",
-        textureWrapMode = "CLAMP",
-        blendMode = "ADD",
-        width = 12,
-        height = 32,
-        xOffset = ResourceXOffset(index),
-        yOffset = 0,
-        anchorPoint = "CENTER",
-        anchorFrameType = "SCREEN",
-        selfPoint = "CENTER",
-        frameStrata = 3,
-        alpha = 0.42,
-        color = borderColor,
-        scalex = 1,
-        scaley = 1,
-        internalVersion = 90,
-        load = GenericLoad(),
-        triggers = {
-            {
-                trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
-                untrigger = {},
-            },
-            disjunctive = "any",
-            activeTriggerMode = -10,
-        },
-        animation = RaynnaRotationHelperResourceFadeAnimation("none"),
-        actions = { start = {}, init = {}, finish = {} },
-        conditions = {},
-        subRegions = {},
-        config = {},
-        authorOptions = {},
-        information = { showNilIsFalse = true, forceEvents = true, ignoreOptionsEventErrors = true },
-    }
-end
-
-local SafeWeakAurasAdd
-local function InstallResourcePips(parentId)
-    SafeWeakAurasAdd(BuildResourceGroup(parentId, false))
-    for i = 1, #RESOURCE_IDS do
-        SafeWeakAurasAdd(BuildResourceBlackOutlineAura(RESOURCE_GROUP_ID, i, true))
-        SafeWeakAurasAdd(BuildResourceFillAura(RESOURCE_GROUP_ID, i, true))
-        SafeWeakAurasAdd(BuildResourceGcdAura(RESOURCE_GROUP_ID, i, true))
-    end
-    SafeWeakAurasAdd(BuildResourceGroup(parentId, true))
-end
 local function ClearGeneratedAuraData()
     WeakAurasSaved.displays[CHILD_ID] = nil
     WeakAurasSaved.displays[ALT_CHILD_ID] = nil
@@ -4152,98 +3800,6 @@ local function PrintActionBarDebug()
     PrintButtonMatches("utility", utilitySpellID)
 end
 
-local function WeakAuraRegion(id)
-    if WeakAuras and WeakAuras.GetRegion then
-        local region = WeakAuras.GetRegion(id)
-        if region then
-            return region
-        end
-    end
-    return _G["WeakAuras:" .. id]
-end
-
-local RESOURCE_FILL_FULL_HEIGHT = 24
-local RESOURCE_FILL_EMPTY_HEIGHT = 0.5
-local RESOURCE_FILL_SPEED = 150
-local RESOURCE_MAX_FLASH_SECONDS = 0.55
-local resourceFillHeights = {}
-local lastResourceCount = 0
-local resourceMaxFlashUntil = 0
-
-local function SetTextureColor(region, color)
-    if region and color then
-        if region.Color then
-            region:Color(color[1], color[2], color[3], color[4])
-        elseif region.texture and region.texture.SetVertexColor then
-            region.texture:SetVertexColor(color[1], color[2], color[3], color[4])
-        end
-    end
-end
-
-local function SetResourceFillHeight(region, height)
-    if not region then return end
-    if region.SetRegionHeight then
-        region:SetRegionHeight(height)
-    elseif region.SetHeight then
-        region:SetHeight(height)
-    end
-end
-
-local function UpdateResourceVisuals(elapsed)
-    local count, maxCount, resource, _, remaining = ComputeResourceInfo()
-    count = count or 0
-    maxCount = maxCount or 0
-    elapsed = elapsed or 0.05
-
-    local now = GetTime and GetTime() or 0
-    if maxCount > 0 and count >= maxCount and (lastResourceCount or 0) < maxCount then
-        resourceMaxFlashUntil = now + RESOURCE_MAX_FLASH_SECONDS
-    end
-    lastResourceCount = count
-
-    local baseColor = ResourceColor(resource)
-    local borderColor = ResourceColor(resource)
-    borderColor[4] = 0.32
-    local flashRemaining = resourceMaxFlashUntil - now
-    local flashActive = flashRemaining > 0
-    local flashAlpha = flashActive and math.max(0.18, math.min(1, flashRemaining / RESOURCE_MAX_FLASH_SECONDS)) or 0
-
-    for i = 1, #RESOURCE_IDS do
-        local fill = WeakAuraRegion(RESOURCE_IDS[i])
-        local target = (i <= count) and RESOURCE_FILL_FULL_HEIGHT or RESOURCE_FILL_EMPTY_HEIGHT
-        local current = resourceFillHeights[i]
-        if current == nil then current = target end
-        local step = RESOURCE_FILL_SPEED * elapsed
-        if current < target then
-            current = math.min(target, current + step)
-        elseif current > target then
-            current = math.max(target, current - step)
-        end
-        resourceFillHeights[i] = current
-
-        if fill then
-            SetResourceFillHeight(fill, current)
-            if fill.SetAlpha then
-                local alpha = current <= RESOURCE_FILL_EMPTY_HEIGHT + 0.01 and 0 or 1
-                if resource == "ARCANE_CHARGES" and remaining and remaining ~= math.huge and remaining <= 4 and i <= count then
-                    alpha = math.max(0.5, 0.55 + 0.45 * math.abs(math.sin(now * 4)))
-                end
-                fill:SetAlpha(alpha)
-            end
-            baseColor[4] = 1
-            SetTextureColor(fill, baseColor)
-        end
-
-        local border = WeakAuraRegion(RESOURCE_GCD_IDS[i])
-        if border then
-            if flashActive and i <= maxCount then
-                SetTextureColor(border, { 1, 0.82, 0.18, 0.38 + 0.62 * flashAlpha })
-            else
-                SetTextureColor(border, borderColor)
-            end
-        end
-    end
-end
 local glowFrame = CreateFrame("Frame")
 glowFrame:SetScript("OnUpdate", function(self, elapsed)
     self.elapsed = (self.elapsed or 0) + elapsed
@@ -4254,7 +3810,7 @@ glowFrame:SetScript("OnUpdate", function(self, elapsed)
     self.elapsed = 0
     UpdateActionBarGlow()
     UpdateHealFrameGlow()
-    UpdateResourceVisuals(tick)
+    if _G.RaynnaRotationHelperUpdateResourceVisuals then _G.RaynnaRotationHelperUpdateResourceVisuals(tick) end
 end)
 
 local function Install()
@@ -4285,7 +3841,7 @@ local function Install()
     SafeWeakAurasAdd(BuildAura(nil, 7, true))
     ClearGeneratedTextFields(UTILITY_CHILD_ID)
     for _, quality in ipairs(GROUND_AOE_QUALITIES) do SafeWeakAurasAdd(BuildGroundAoeIndicator(nil, quality)) end
-    InstallResourcePips(nil)
+    if _G.RaynnaRotationHelperInstallResourcePips then _G.RaynnaRotationHelperInstallResourcePips(nil) end
 
     C_Timer.After(0.1, function()
         SafeWeakAurasAdd(BuildAura(TARGET_ID, 1))
@@ -4303,7 +3859,7 @@ local function Install()
         SafeWeakAurasAdd(BuildAura(TARGET_ID, 7))
         ClearGeneratedTextFields(UTILITY_CHILD_ID)
         for _, quality in ipairs(GROUND_AOE_QUALITIES) do SafeWeakAurasAdd(BuildGroundAoeIndicator(TARGET_ID, quality)) end
-        InstallResourcePips(TARGET_ID)
+        if _G.RaynnaRotationHelperInstallResourcePips then _G.RaynnaRotationHelperInstallResourcePips(TARGET_ID) end
         SafeWeakAurasAdd(BuildGroup(true))
         SanitizeWeakAurasHierarchy()
         WeakAuras.ScanEvents("PLAYER_TARGET_CHANGED")
@@ -4493,7 +4049,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     if event == "COMBAT_LOG_EVENT_UNFILTERED" then
         TrackCombatLogHostileAttacker(...)
         UpdateActionBarGlow()
-        UpdateResourceVisuals(0.05)
+        if _G.RaynnaRotationHelperUpdateResourceVisuals then _G.RaynnaRotationHelperUpdateResourceVisuals(0.05) end
         if WeakAuras and WeakAuras.ScanEvents then
             WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
         end
@@ -4527,7 +4083,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end
     UpdateActionBarGlow()
     UpdateHealFrameGlow()
-    UpdateResourceVisuals(0.05)
+    if _G.RaynnaRotationHelperUpdateResourceVisuals then _G.RaynnaRotationHelperUpdateResourceVisuals(0.05) end
     if WeakAuras and WeakAuras.ScanEvents then
         WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
     end
