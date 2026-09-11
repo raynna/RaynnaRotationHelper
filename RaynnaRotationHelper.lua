@@ -2602,9 +2602,18 @@ local function PreferredWarlockPetSpell(ctx)
     if mode == PET_AUTO then
         mode = InGroupContent() and PET_DUNGEON or PET_SOLO
     end
-    if mode == PET_DUNGEON and ctx.known(691) then return 691 end
-    if mode == PET_SOLO and ctx.known(697) then return 697 end
-    return ctx.readyAny(nil, nil, 691, 697, 688, 712, 30146)
+    if mode == PET_DUNGEON then
+        if ctx.known(691) then return 691 end
+        if ctx.known(688) then return 688 end
+        if ctx.known(712) then return 712 end
+        if ctx.known(697) then return 697 end
+    elseif mode == PET_SOLO then
+        if ctx.known(697) then return 697 end
+        if ctx.known(688) then return 688 end
+        if ctx.known(712) then return 712 end
+        if ctx.known(691) then return 691 end
+    end
+    return ctx.readyAny(nil, nil, 691, 688, 697, 712, 30146)
 end
 local function GenericPetRecommendation(ctx)
     if ctx.class == "HUNTER" then
