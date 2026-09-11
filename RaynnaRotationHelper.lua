@@ -49,15 +49,30 @@ local ADDON_NAME = "Raynna Rotation Helper"
 local MODE_AUTO = "auto"
 local MODE_BOSS = "boss"
 local MODE_TRASH = "trash"
+local PET_AUTO = "auto"
+local PET_DUNGEON = "dungeon"
+local PET_SOLO = "solo"
+local PET_OFF = "off"
 
 local function GetDB()
     RaynnaRotationHelperDB = RaynnaRotationHelperDB or {}
     if RaynnaRotationHelperDB.mode ~= MODE_BOSS and RaynnaRotationHelperDB.mode ~= MODE_TRASH then
         RaynnaRotationHelperDB.mode = MODE_AUTO
     end
+    if RaynnaRotationHelperDB.warlockPetMode ~= PET_DUNGEON and RaynnaRotationHelperDB.warlockPetMode ~= PET_SOLO and RaynnaRotationHelperDB.warlockPetMode ~= PET_OFF then
+        RaynnaRotationHelperDB.warlockPetMode = PET_AUTO
+    end
+    if RaynnaRotationHelperDB.actionBarGlow == nil then
+        RaynnaRotationHelperDB.actionBarGlow = true
+    end
+    if RaynnaRotationHelperDB.groundAoeIndicator == nil then
+        RaynnaRotationHelperDB.groundAoeIndicator = true
+    end
+    if RaynnaRotationHelperDB.healFrameGlow == nil then
+        RaynnaRotationHelperDB.healFrameGlow = true
+    end
     return RaynnaRotationHelperDB
 end
-
 local function GetMode()
     return GetDB().mode or MODE_AUTO
 end
@@ -68,6 +83,27 @@ local function SetMode(mode)
     end
     GetDB().mode = mode
     return mode
+end
+
+local function GetWarlockPetMode()
+    return GetDB().warlockPetMode or PET_AUTO
+end
+
+local function SetWarlockPetMode(mode)
+    if mode ~= PET_DUNGEON and mode ~= PET_SOLO and mode ~= PET_OFF then
+        mode = PET_AUTO
+    end
+    GetDB().warlockPetMode = mode
+    return mode
+end
+
+local function SettingEnabled(key)
+    return GetDB()[key] ~= false
+end
+
+local function SetSettingEnabled(key, enabled)
+    GetDB()[key] = enabled and true or false
+    return GetDB()[key]
 end
 
 local PRIMARY_NEXT_ACTION_SOURCE = [=[
@@ -2519,15 +2555,71 @@ local function GenericInterruptRecommendation(ctx)
 
     return nil, "interrupt/control unavailable"
 end
+local function InGroupContent()
+    local instanceType
+    if GetInstanceInfo then
+        _, instanceType = GetInstanceInfo()
+    end
+    if instanceType == "party" or instanceType == "raid" or instanceType == "scenario" then
+        return true
+    end
+    return IsInGroup and IsInGroup() or false
+end
+
+local function PetNameLooksLike(...)
+    if not UnitExists("pet") or UnitIsDead("pet") then
+        return false
+    end
+    local petName = UnitName("pet") or ""
+    local family = UnitCreatureFamily and UnitCreatureFamily("pet") or ""
+    local haystack = (petName .. " " .. family):lower()
+    for i = 1, select("#", ...) do
+        local needle = select(i, ...)
+        if needle and haystack:find(tostring(needle):lower(), 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function WarlockPetMatchesSpell(spellID)
+    if spellID == 30146 then return PetNameLooksLike("felguard", "wrathguard") end
+    if spellID == 691 then return PetNameLooksLike("felhunter", "observer") end
+    if spellID == 697 then return PetNameLooksLike("voidwalker", "voidlord") end
+    if spellID == 688 then return PetNameLooksLike("imp", "fel imp") end
+    if spellID == 712 then return PetNameLooksLike("succubus", "shivarra") end
+    return false
+end
+
+local function PreferredWarlockPetSpell(ctx)
+    if GetWarlockPetMode() == PET_OFF or ctx.buffRem("player", 108503) > 0 then
+        return nil
+    end
+    if ctx.spec == 2 and ctx.known(30146) then
+        return 30146
+    end
+    local mode = GetWarlockPetMode()
+    if mode == PET_AUTO then
+        mode = InGroupContent() and PET_DUNGEON or PET_SOLO
+    end
+    if mode == PET_DUNGEON and ctx.known(691) then return 691 end
+    if mode == PET_SOLO and ctx.known(697) then return 697 end
+    return ctx.readyAny(nil, nil, 691, 697, 688, 712, 30146)
+end
 local function GenericPetRecommendation(ctx)
     if ctx.class == "HUNTER" then
         if ctx.known(982) and UnitExists("pet") and UnitIsDead("pet") and ctx.ready(982) then return 982, "pet dead" end
         if ctx.known(883) and not ctx.petAlive() and ctx.ready(883) then return 883, "pet missing" end
         if ctx.petAlive() and ctx.petHpPct() < 70 and ctx.ready(136) then return 136, "pet low health" end
     elseif ctx.class == "WARLOCK" then
-        if not ctx.hasPetOrSacrifice() then
-            local summon = ctx.readyAny(nil, nil, 30146, 691, 697, 712, 688)
-            if summon then return summon, "pet missing" end
+        local preferredPet = PreferredWarlockPetSpell(ctx)
+        if preferredPet and ctx.ready(preferredPet) then
+            if not ctx.hasPetOrSacrifice() then
+                return preferredPet, "preferred pet missing"
+            end
+            if ctx.petAlive() and not WarlockPetMatchesSpell(preferredPet) and (not UnitAffectingCombat or not UnitAffectingCombat("player")) then
+                return preferredPet, "preferred pet for " .. GetWarlockPetMode()
+            end
         end
         if ctx.petAlive() and ctx.petHpPct() < 65 and ctx.cooldownReady(755) then return 755, "pet low health" end
     elseif ctx.class == "MAGE" and ctx.spec == 3 then
@@ -3467,6 +3559,83 @@ local bindingByPrefix = {
 }
 
 local activeGlowButtons = {}
+local activeHealFrame
+
+local function IsHealerSpec(ctx)
+    if ctx.class == "DRUID" then return ctx.spec == 4 end
+    if ctx.class == "PALADIN" then return ctx.spec == 1 end
+    if ctx.class == "PRIEST" then return ctx.spec == 1 or ctx.spec == 2 end
+    if ctx.class == "SHAMAN" then return ctx.spec == 3 end
+    if ctx.class == "MONK" then return ctx.spec == 2 end
+    return false
+end
+
+local function EnsureHealFrameGlow(frame)
+    if frame.RaynnaHealGlow then return frame.RaynnaHealGlow end
+    local glow = frame:CreateTexture(nil, "OVERLAY")
+    glow:SetTexture("Interface/Buttons/UI-ActionButton-Border")
+    glow:SetBlendMode("ADD")
+    glow:SetVertexColor(0.2, 1, 0.35, 1)
+    glow:SetAlpha(1)
+    glow:SetPoint("CENTER", frame, "CENTER", 0, 0)
+    glow:SetSize((frame:GetWidth() or 80) * 1.18, (frame:GetHeight() or 36) * 1.65)
+    glow:Hide()
+    frame.RaynnaHealGlow = glow
+    return glow
+end
+
+local function HideHealFrameGlow()
+    if activeHealFrame and activeHealFrame.RaynnaHealGlow then
+        activeHealFrame.RaynnaHealGlow:Hide()
+    end
+    activeHealFrame = nil
+end
+
+local function FrameUnit(frame, fallback)
+    return frame and (frame.unit or frame.displayedUnit or fallback)
+end
+
+local function MaybeGlowHealFrame(frame, fallback, unit)
+    if not frame or not frame.IsVisible or not frame:IsVisible() then return false end
+    local frameUnit = FrameUnit(frame, fallback)
+    if frameUnit and UnitExists(frameUnit) and UnitIsUnit(frameUnit, unit) then
+        local glow = EnsureHealFrameGlow(frame)
+        glow:Show()
+        activeHealFrame = frame
+        return true
+    end
+    return false
+end
+
+local function UpdateHealFrameGlow()
+    if not SettingEnabled("healFrameGlow") then
+        HideHealFrameGlow()
+        return
+    end
+    local ctx = BuildContext()
+    if not IsHealerSpec(ctx) then
+        HideHealFrameGlow()
+        return
+    end
+    local unit = ctx.healUnit()
+    if not unit or unit == "player" or ctx.unitHpPct(unit) > 92 then
+        HideHealFrameGlow()
+        return
+    end
+    if activeHealFrame and MaybeGlowHealFrame(activeHealFrame, nil, unit) then
+        return
+    end
+    HideHealFrameGlow()
+    for i = 1, 5 do
+        if MaybeGlowHealFrame(_G["CompactPartyFrameMember" .. i], "party" .. i, unit) then return end
+    end
+    for i = 1, 40 do
+        if MaybeGlowHealFrame(_G["CompactRaidFrame" .. i], nil, unit) then return end
+    end
+    for i = 1, 4 do
+        if MaybeGlowHealFrame(_G["PartyMemberFrame" .. i], "party" .. i, unit) then return end
+    end
+end
 
 local function ShortKeybind(key)
     if not key or key == "" then
@@ -3612,6 +3781,9 @@ function _G.RaynnaRotationHelperGetSpellKeybind(spellID)
 end
 
 local function GroundAoeInfo(spellID)
+    if not SettingEnabled("groundAoeIndicator") then
+        return nil
+    end
     if not spellID then
         local recommendations = { ComputeRecommendations() }
         for _, candidate in ipairs(recommendations) do
@@ -3723,6 +3895,10 @@ local function HideGlow(button)
 end
 
 local function UpdateActionBarGlow()
+    if not SettingEnabled("actionBarGlow") then
+        for button in pairs(activeGlowButtons) do HideGlow(button) end
+        return
+    end
     local primary, alternate = ComputeRecommendations()
     for button in pairs(activeGlowButtons) do
         if (not primary or not ButtonMatchesSpell(button, primary)) and (not alternate or not ButtonMatchesSpell(button, alternate)) then
@@ -3819,6 +3995,7 @@ glowFrame:SetScript("OnUpdate", function(self, elapsed)
     end
     self.elapsed = 0
     UpdateActionBarGlow()
+    UpdateHealFrameGlow()
     UpdateResourcePulse()
 end)
 
@@ -3875,6 +4052,90 @@ local function Install()
     end)
 end
 
+local optionsPanel
+local function RefreshOptionsPanel()
+    if not optionsPanel then return end
+    if optionsPanel.modeButton then optionsPanel.modeButton:SetText("Rotation mode: " .. GetMode()) end
+    if optionsPanel.petButton then optionsPanel.petButton:SetText("Warlock pet: " .. GetWarlockPetMode()) end
+    if optionsPanel.glowCheck then optionsPanel.glowCheck:SetChecked(SettingEnabled("actionBarGlow")) end
+    if optionsPanel.groundCheck then optionsPanel.groundCheck:SetChecked(SettingEnabled("groundAoeIndicator")) end
+    if optionsPanel.healCheck then optionsPanel.healCheck:SetChecked(SettingEnabled("healFrameGlow")) end
+end
+
+local function CreateOptionsButton(parent, text, x, y, width, onClick)
+    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    button:SetSize(width or 210, 24)
+    button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    button:SetText(text)
+    button:SetScript("OnClick", onClick)
+    return button
+end
+
+local function CreateOptionsCheck(parent, text, x, y, key)
+    local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    check:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    check.text = check:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    check.text:SetPoint("LEFT", check, "RIGHT", 2, 0)
+    check.text:SetText(text)
+    check:SetScript("OnClick", function(self)
+        SetSettingEnabled(key, self:GetChecked())
+        UpdateActionBarGlow()
+        if WeakAuras and WeakAuras.ScanEvents then WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE") end
+    end)
+    return check
+end
+
+local function CreateOptionsPanel()
+    if optionsPanel or not InterfaceOptions_AddCategory then return optionsPanel end
+    optionsPanel = CreateFrame("Frame", "RaynnaRotationHelperOptionsPanel")
+    optionsPanel.name = ADDON_NAME
+    local title = optionsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", optionsPanel, "TOPLEFT", 16, -16)
+    title:SetText(ADDON_NAME)
+    local note = optionsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    note:SetPoint("TOPLEFT", optionsPanel, "TOPLEFT", 16, -44)
+    note:SetText("Simple behavior settings. Use WeakAuras to drag or fine tune display positions.")
+    optionsPanel.modeButton = CreateOptionsButton(optionsPanel, "Rotation mode", 16, -78, 230, function()
+        local mode = GetMode()
+        if mode == MODE_AUTO then mode = MODE_BOSS elseif mode == MODE_BOSS then mode = MODE_TRASH else mode = MODE_AUTO end
+        SetMode(mode)
+        RefreshOptionsPanel()
+    end)
+    optionsPanel.petButton = CreateOptionsButton(optionsPanel, "Warlock pet", 16, -110, 230, function()
+        local mode = GetWarlockPetMode()
+        if mode == PET_AUTO then mode = PET_DUNGEON elseif mode == PET_DUNGEON then mode = PET_SOLO elseif mode == PET_SOLO then mode = PET_OFF else mode = PET_AUTO end
+        SetWarlockPetMode(mode)
+        RefreshOptionsPanel()
+    end)
+    optionsPanel.glowCheck = CreateOptionsCheck(optionsPanel, "Action bar glow", 16, -150, "actionBarGlow")
+    optionsPanel.groundCheck = CreateOptionsCheck(optionsPanel, "Ground AoE quality square", 16, -180, "groundAoeIndicator")
+    optionsPanel.healCheck = CreateOptionsCheck(optionsPanel, "Highlight lowest visible party/raid frame for healers", 16, -210, "healFrameGlow")
+    CreateOptionsButton(optionsPanel, "Open WeakAuras group", 16, -252, 230, function()
+        if WeakAuras and WeakAuras.OpenOptions then WeakAuras.OpenOptions(TARGET_ID) elseif WeakAuras and WeakAuras.ToggleOptions then WeakAuras.ToggleOptions() end
+    end)
+    InterfaceOptions_AddCategory(optionsPanel)
+    RefreshOptionsPanel()
+    return optionsPanel
+end
+
+local function OpenOptionsPanel()
+    local panel = CreateOptionsPanel()
+    RefreshOptionsPanel()
+    if panel and InterfaceOptionsFrame_OpenToCategory then
+        InterfaceOptionsFrame_OpenToCategory(panel)
+        InterfaceOptionsFrame_OpenToCategory(panel)
+    end
+end
+
+local function OpenWeakAurasGroup()
+    if WeakAuras and WeakAuras.OpenOptions then
+        WeakAuras.OpenOptions(TARGET_ID)
+    elseif WeakAuras and WeakAuras.ToggleOptions then
+        WeakAuras.ToggleOptions()
+    else
+        print("|cff66ccff" .. ADDON_NAME .. ":|r WeakAuras options are not available.")
+    end
+end
 SLASH_RAYNNAROTATIONHELPER1 = "/rrh"
 SLASH_RAYNNAROTATIONHELPER2 = "/raynna"
 SLASH_RAYNNAROTATIONHELPER3 = "/crh"
@@ -3883,6 +4144,25 @@ SlashCmdList.RAYNNAROTATIONHELPER = function(msg)
     msg = msg and msg:lower():match("^%s*(.-)%s*$") or ""
     if msg == "debug" or msg == "d" then
         PrintActionBarDebug()
+        return
+    end
+    if msg == "settings" or msg == "options" then
+        OpenOptionsPanel()
+        return
+    end
+    if msg == "unlock" or msg == "move" then
+        OpenWeakAurasGroup()
+        return
+    end
+    if msg == "pet" then
+        print("|cff66ccff" .. ADDON_NAME .. ":|r warlock pet mode is " .. GetWarlockPetMode() .. " (/rrh pet auto, dungeon, solo, off)")
+        return
+    end
+    local requestedPetMode = msg:match("^pet%s+(%S+)$")
+    if requestedPetMode then
+        local mode = SetWarlockPetMode(requestedPetMode)
+        print("|cff66ccff" .. ADDON_NAME .. ":|r warlock pet mode set to " .. mode)
+        RefreshOptionsPanel()
         return
     end
     if msg == "mode" then
@@ -3894,13 +4174,14 @@ SlashCmdList.RAYNNAROTATIONHELPER = function(msg)
         local mode = SetMode(requestedMode or msg)
         print("|cff66ccff" .. ADDON_NAME .. ":|r mode set to " .. mode)
         UpdateActionBarGlow()
+        UpdateHealFrameGlow()
         if WeakAuras and WeakAuras.ScanEvents then
             WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
         end
         return
     end
     if msg == "help" or msg == "?" then
-        print("|cff66ccff" .. ADDON_NAME .. ":|r /rrh debug, /rrh mode, /rrh mode auto, /rrh mode boss, /rrh mode trash")
+        print("|cff66ccff" .. ADDON_NAME .. ":|r /rrh debug, /rrh settings, /rrh unlock, /rrh mode auto|boss|trash, /rrh pet auto|dungeon|solo|off")
         return
     end
     Install()
@@ -3929,6 +4210,8 @@ SafeRegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
 SafeRegisterEvent("UNIT_SPELLCAST_INTERRUPTABLE")
 SafeRegisterEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE")
 SafeRegisterEvent("UNIT_AURA")
+SafeRegisterEvent("UNIT_HEALTH")
+SafeRegisterEvent("UNIT_MAXHEALTH")
 SafeRegisterEvent("UNIT_POWER")
 SafeRegisterEvent("UNIT_POWER_FREQUENT")
 SafeRegisterEvent("UNIT_PET")
@@ -3964,13 +4247,15 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end
     local unit = ...
     if event == "PLAYER_LOGIN" then
+        CreateOptionsPanel()
         C_Timer.After(1, Install)
         return
     end
-    if unit and unit ~= "player" and unit ~= "target" and unit ~= "pet" then
+    if unit and unit ~= "player" and unit ~= "target" and unit ~= "pet" and not tostring(unit):match("^party") and not tostring(unit):match("^raid") then
         return
     end
     UpdateActionBarGlow()
+    UpdateHealFrameGlow()
     UpdateResourcePulse()
     if WeakAuras and WeakAuras.ScanEvents then
         WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
