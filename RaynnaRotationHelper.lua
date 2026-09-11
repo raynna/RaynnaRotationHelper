@@ -32,14 +32,15 @@ for i = 1, 5 do
     RESOURCE_OUTLINE_IDS[i] = TARGET_ID .. " - Pip " .. i .. " BlackOutline"
     RESOURCE_GCD_IDS[i] = TARGET_ID .. " - Pip " .. i .. " GCD"
 end
-local CHILD_UID = "raynna-rotation-next-action"
-local ALT_CHILD_UID = "raynna-rotation-next-action-alt"
-local DEFENSIVE_CHILD_UID = "raynna-rotation-defensive-action"
-local THREAT_CHILD_UID = "raynna-rotation-threat-action"
-local INTERRUPT_CHILD_UID = "raynna-rotation-interrupt-action"
-local PET_CHILD_UID = "raynna-rotation-pet-action"
-local UTILITY_CHILD_UID = "raynna-rotation-utility-action"
-local GROUND_AOE_INDICATOR_UIDS = {
+local ACTION_UIDS = {
+    [1] = "raynna-rotation-next-action",
+    [2] = "raynna-rotation-next-action-alt",
+    [3] = "raynna-rotation-defensive-action",
+    [4] = "raynna-rotation-threat-action",
+    [5] = "raynna-rotation-interrupt-action",
+    [6] = "raynna-rotation-pet-action",
+    [7] = "raynna-rotation-utility-action",
+}local GROUND_AOE_INDICATOR_UIDS = {
     BAD = "raynna-rotation-ground-aoe-bad",
     OK = "raynna-rotation-ground-aoe-ok",
     GOOD = "raynna-rotation-ground-aoe-good",
@@ -2866,7 +2867,7 @@ local function BuildAura(parentId, slot, forceChild)
     local showGcd = slot == 1 or slot == 2
     local childMode = parentId or forceChild
     local auraId = CHILD_ID
-    local auraUid = CHILD_UID
+    local auraUid = ACTION_UIDS[1]
     local displayIcon = 132135
     local customSource = PRIMARY_NEXT_ACTION_SOURCE
     local xOffset = -28
@@ -2877,13 +2878,13 @@ local function BuildAura(parentId, slot, forceChild)
 
     if isAlt then
         auraId = ALT_CHILD_ID
-        auraUid = ALT_CHILD_UID
+        auraUid = ACTION_UIDS[2]
         displayIcon = 132122
         customSource = ALT_NEXT_ACTION_SOURCE
         xOffset = 28
     elseif isDefensive then
         auraId = DEFENSIVE_CHILD_ID
-        auraUid = DEFENSIVE_CHILD_UID
+        auraUid = ACTION_UIDS[3]
         displayIcon = 135920
         customSource = DEFENSIVE_NEXT_ACTION_SOURCE
         xOffset = 76
@@ -2893,7 +2894,7 @@ local function BuildAura(parentId, slot, forceChild)
         glowColor = { 0.25, 0.95, 0.65, 1 }
     elseif isThreat then
         auraId = THREAT_CHILD_ID
-        auraUid = THREAT_CHILD_UID
+        auraUid = ACTION_UIDS[4]
         displayIcon = 132270
         customSource = THREAT_ACTION_SOURCE
         xOffset = -76
@@ -2903,7 +2904,7 @@ local function BuildAura(parentId, slot, forceChild)
         glowColor = { 1, 0.08, 0.04, 1 }
     elseif isInterrupt then
         auraId = INTERRUPT_CHILD_ID
-        auraUid = INTERRUPT_CHILD_UID
+        auraUid = ACTION_UIDS[5]
         displayIcon = 132219
         customSource = INTERRUPT_ACTION_SOURCE
         xOffset = 0
@@ -2913,7 +2914,7 @@ local function BuildAura(parentId, slot, forceChild)
         glowColor = { 1, 0.82, 0.16, 1 }
     elseif isPet then
         auraId = PET_CHILD_ID
-        auraUid = PET_CHILD_UID
+        auraUid = ACTION_UIDS[6]
         displayIcon = 132161
         customSource = PET_ACTION_SOURCE
         xOffset = 116
@@ -2923,7 +2924,7 @@ local function BuildAura(parentId, slot, forceChild)
         glowColor = { 0.45, 0.72, 1, 1 }
     elseif isUtility then
         auraId = UTILITY_CHILD_ID
-        auraUid = UTILITY_CHILD_UID
+        auraUid = ACTION_UIDS[7]
         displayIcon = 136033
         customSource = UTILITY_ACTION_SOURCE
         xOffset = -116
@@ -3328,126 +3329,6 @@ function SafeWeakAurasAdd(data)
     return true
 end
 
-local REAL_RESOURCE_GROUP_ID = "Druid Combo points"
-local REAL_RESOURCE_FILL_IDS = { "CP 1", "CP 2", "CP 3", "CP 4", "CP 5" }
-local REAL_RESOURCE_OUTLINE_IDS = { "CP1BlackOutline", "CP2BlackOutline", "CP3BlackOutline", "CP4BlackOutline", "CP5BlackOutline" }
-local REAL_RESOURCE_GCD_IDS = { "CP1YellowOutline GCD", "CP2YellowOutline GCD", "CP3YellowOutline GCD", "CP4YellowOutline GCD", "CP5YellowOutline GCD" }
-
-local function DynamicResourceLoad()
-    return { use_petbattle = false, use_vehicleUi = false, use_never = false, class = { multi = {} }, class_and_spec = { multi = {} }, talent = { multi = {} }, spec = { multi = {} }, size = { multi = {} } }
-end
-
-local function PatchDynamicResourceDisplay(data)
-    data.load = DynamicResourceLoad()
-    data.wagoID = nil
-    data.url = nil
-    data.semver = nil
-    data.tocversion = nil
-    data.source = nil
-    data.preferToUpdate = false
-    data.information = data.information or {}
-    data.information.forceEvents = true
-    data.information.ignoreOptionsEventErrors = true
-end
-
-local function PatchDynamicResourceGroup()
-    if not WeakAurasSaved or not WeakAurasSaved.displays then
-        return false
-    end
-    local displays = WeakAurasSaved.displays
-    local group = displays[REAL_RESOURCE_GROUP_ID]
-    if not group then
-        return false
-    end
-
-    local _, _, resource = ComputeResourceInfo()
-
-    PatchDynamicResourceDisplay(group)
-    group.parent = TARGET_ID
-    group.controlledChildren = {}
-    local function addExistingChild(id)
-        if displays[id] then
-            table.insert(group.controlledChildren, id)
-        end
-    end
-    for i = 1, #REAL_RESOURCE_FILL_IDS do
-        addExistingChild(REAL_RESOURCE_FILL_IDS[i])
-    end
-    for i = 1, #REAL_RESOURCE_OUTLINE_IDS do
-        addExistingChild(REAL_RESOURCE_OUTLINE_IDS[i])
-    end
-    for i = 1, #REAL_RESOURCE_GCD_IDS do
-        addExistingChild(REAL_RESOURCE_GCD_IDS[i])
-    end
-    SafeWeakAurasAdd(group)
-    for i = 1, 5 do
-        local fill = displays[REAL_RESOURCE_FILL_IDS[i]]
-        if fill then
-            PatchDynamicResourceDisplay(fill)
-            fill.parent = REAL_RESOURCE_GROUP_ID
-            fill.color = ResourceColor(resource)
-            fill.triggers = {
-                {
-                    trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(i)), debuffType = "HELPFUL" },
-                    untrigger = {},
-                },
-                disjunctive = "all",
-                activeTriggerMode = -10,
-            }
-            SafeWeakAurasAdd(fill)
-        end
-
-        local outline = displays[REAL_RESOURCE_OUTLINE_IDS[i]]
-        if outline then
-            PatchDynamicResourceDisplay(outline)
-            outline.parent = REAL_RESOURCE_GROUP_ID
-            outline.color = { 0, 0, 0, 1 }
-            outline.triggers = {
-                {
-                    trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(i)), debuffType = "HELPFUL" },
-                    untrigger = {},
-                },
-                disjunctive = "any",
-                activeTriggerMode = -10,
-            }
-            SafeWeakAurasAdd(outline)
-        end
-
-        local gcd = displays[REAL_RESOURCE_GCD_IDS[i]]
-        if gcd then
-            PatchDynamicResourceDisplay(gcd)
-            gcd.parent = REAL_RESOURCE_GROUP_ID
-            gcd.load = DynamicResourceLoad()
-            gcd.triggers = {
-                {
-                    trigger = {
-                        type = "spell",
-                        event = "Global Cooldown",
-                        unit = "player",
-                        use_unit = true,
-                        unevent = "auto",
-                        duration = "1",
-                        use_inverse = false,
-                        names = {},
-                        spellIds = {},
-                        subeventPrefix = "SPELL",
-                        subeventSuffix = "_CAST_START",
-                        debuffType = "HELPFUL",
-                    },
-                    untrigger = {},
-                },
-                {
-                    trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(i)), debuffType = "HELPFUL" },
-                    untrigger = {},
-                },
-                disjunctive = "all",
-                activeTriggerMode = -10,
-            }
-            SafeWeakAurasAdd(gcd)
-        end
-    end
-    return true
-end
 local function SetChildDisabled(data, disabled)
     data.load = data.load or {}
     data.load.use_never = disabled and true or false
@@ -3988,11 +3869,8 @@ local function WeakAuraRegion(id)
 end
 
 local function SetResourceFillAlpha(alpha)
-    if not REAL_RESOURCE_FILL_IDS then
-        return
-    end
-    for i = 1, #REAL_RESOURCE_FILL_IDS do
-        local region = WeakAuraRegion(REAL_RESOURCE_FILL_IDS[i])
+    for i = 1, #RESOURCE_IDS do
+        local region = WeakAuraRegion(RESOURCE_IDS[i])
         if region and region.SetAlpha then
             region:SetAlpha(alpha)
         end
@@ -4006,8 +3884,8 @@ local function UpdateResourcePulse()
         return
     end
     local pulse = 0.55 + 0.45 * math.abs(math.sin(GetTime() * 4))
-    for i = 1, #REAL_RESOURCE_FILL_IDS do
-        local region = WeakAuraRegion(REAL_RESOURCE_FILL_IDS[i])
+    for i = 1, #RESOURCE_IDS do
+        local region = WeakAuraRegion(RESOURCE_IDS[i])
         if region and region.SetAlpha then
             region:SetAlpha(i <= count and pulse or 1)
         end
@@ -4112,7 +3990,7 @@ local function CreateOptionsCheck(parent, text, x, y, key)
 end
 
 local function CreateOptionsPanel()
-    if optionsPanel or not InterfaceOptions_AddCategory then return optionsPanel end
+    if optionsPanel then return optionsPanel end
     optionsPanel = CreateFrame("Frame", "RaynnaRotationHelperOptionsPanel")
     optionsPanel.name = ADDON_NAME
     local title = optionsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
@@ -4139,7 +4017,14 @@ local function CreateOptionsPanel()
     CreateOptionsButton(optionsPanel, "Open WeakAuras group", 16, -252, 230, function()
         if WeakAuras and WeakAuras.OpenOptions then WeakAuras.OpenOptions(TARGET_ID) elseif WeakAuras and WeakAuras.ToggleOptions then WeakAuras.ToggleOptions() end
     end)
-    InterfaceOptions_AddCategory(optionsPanel)
+    if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+        local category = Settings.RegisterCanvasLayoutCategory(optionsPanel, ADDON_NAME)
+        optionsPanel.category = category
+        optionsPanel.categoryId = category and category.ID
+        Settings.RegisterAddOnCategory(category)
+    elseif InterfaceOptions_AddCategory then
+        InterfaceOptions_AddCategory(optionsPanel)
+    end
     RefreshOptionsPanel()
     return optionsPanel
 end
@@ -4147,9 +4032,13 @@ end
 local function OpenOptionsPanel()
     local panel = CreateOptionsPanel()
     RefreshOptionsPanel()
-    if panel and InterfaceOptionsFrame_OpenToCategory then
+    if panel and Settings and Settings.OpenToCategory and panel.categoryId then
+        Settings.OpenToCategory(panel.categoryId)
+    elseif panel and InterfaceOptionsFrame_OpenToCategory then
         InterfaceOptionsFrame_OpenToCategory(panel)
         InterfaceOptionsFrame_OpenToCategory(panel)
+    else
+        print("|cff66ccff" .. ADDON_NAME .. ":|r settings panel is not available on this client.")
     end
 end
 
