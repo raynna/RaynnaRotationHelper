@@ -1544,6 +1544,18 @@ local function HunterMarkingShot(ctx, focus)
     return nil
 end
 
+local function HunterMultiShot(ctx, focus, minTargets)
+    focus = focus or ctx.power(ctx.focusType)
+    minTargets = minTargets or 2
+    local clustered = ctx.clusteredEnemyCount and ctx.clusteredEnemyCount(10) or 0
+    local enemies = ctx.enemyCount and ctx.enemyCount() or clustered
+    local count = clustered > 0 and clustered or enemies
+    if count >= minTargets and focus >= 40 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then
+        return 2643
+    end
+    return nil
+end
+
 local function HunterFocusBuilder(ctx)
     return ctx.readyAnyInRange(77767, 56641)
 end
@@ -1578,6 +1590,8 @@ RegisterRotation("HUNTER:1", {
         local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
         local freshSerpent = HunterSerpentSting(ctx, 0)
         if freshSerpent then return freshSerpent end
+        local multi = HunterMultiShot(ctx, focus, 2)
+        if multi then return multi end
         local marking = HunterMarkingShot(ctx, focus)
         if marking then return marking end
         if ctx.petAlive() and ctx.ready(34026, 40, ctx.focusType) and ctx.inRange(34026) then return 34026 end
@@ -1588,8 +1602,8 @@ RegisterRotation("HUNTER:1", {
         if ctx.petAlive() and ctx.buffStacks("pet", 19615) >= 5 and ctx.ready(82692) then return 82692 end
         local talent = HunterTalent(ctx)
         if talent then return talent end
-        if enemies >= 2 and focus >= 40 and ctx.buffRem("pet", 118455) <= 1.5 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
-        if enemies >= 2 and focus >= 55 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
+        multi = HunterMultiShot(ctx, focus, 2)
+        if multi then return multi end
         return HunterFallback(ctx, focus, 55)
     end,
 })
@@ -1611,11 +1625,14 @@ RegisterRotation("HUNTER:2", {
         local aimedProc = ctx.buffRem("player", 82925) > 0
         local freshSerpent = HunterSerpentSting(ctx, 0)
         if freshSerpent then return freshSerpent end
+        local multi = HunterMultiShot(ctx, focus, 2)
+        if multi then return multi end
         local marking = HunterMarkingShot(ctx, focus)
         if marking then return marking end
         if aimedProc and ctx.ready(19434) and ctx.inRange(19434) then return 19434 end
         if enemies < 10 and ctx.ready(53209, 45, ctx.focusType) and ctx.inRange(53209) then return 53209 end
-        if enemies >= 4 and focus >= 40 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
+        multi = HunterMultiShot(ctx, focus, 4)
+        if multi then return multi end
         local serpent = HunterSerpentSting(ctx, 3)
         if serpent then return serpent end
         if targetHp <= 20 and ctx.ready(53351) and ctx.inRange(53351) then return 53351 end
@@ -1643,13 +1660,15 @@ RegisterRotation("HUNTER:3", {
         local lockAndLoad = ctx.buffRem("player", 56453) > 0
         local freshSerpent = HunterSerpentSting(ctx, 0)
         if freshSerpent then return freshSerpent end
+        local multi = HunterMultiShot(ctx, focus, 4)
+        if multi then return multi end
         local marking = HunterMarkingShot(ctx, focus)
         if marking then return marking end
-        if enemies >= 4 and focus >= 40 and ctx.debuffRem("target", 1978, true) <= 0 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
         if (enemies < 6 or lockAndLoad) and ctx.ready(53301, 25, ctx.focusType) and ctx.inRange(53301) then return 53301 end
         if ctx.targetHpPct() <= 20 and ctx.ready(53351) and ctx.inRange(53351) then return 53351 end
         if ctx.debuffRem("target", 3674, true) <= 3 and ctx.ready(3674, 35, ctx.focusType) and ctx.inRange(3674) then return 3674 end
-        if enemies >= 2 and focus >= 40 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
+        multi = HunterMultiShot(ctx, focus, 2)
+        if multi then return multi end
         local serpent = HunterSerpentSting(ctx, 3)
         if serpent then return serpent end
         local talent = HunterTalent(ctx)
