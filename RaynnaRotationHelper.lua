@@ -28,9 +28,9 @@ local RESOURCE_IDS = {}
 local RESOURCE_OUTLINE_IDS = {}
 local RESOURCE_GCD_IDS = {}
 for i = 1, 5 do
-    RESOURCE_IDS[i] = TARGET_ID .. " - Pip " .. i
-    RESOURCE_OUTLINE_IDS[i] = TARGET_ID .. " - Pip " .. i .. " BlackOutline"
-    RESOURCE_GCD_IDS[i] = TARGET_ID .. " - Pip " .. i .. " GCD"
+    RESOURCE_IDS[i] = RESOURCE_GROUP_ID .. " - CP " .. i
+    RESOURCE_OUTLINE_IDS[i] = RESOURCE_GROUP_ID .. " - CP" .. i .. "BlackOutline"
+    RESOURCE_GCD_IDS[i] = RESOURCE_GROUP_ID .. " - CP" .. i .. "YellowOutline GCD"
 end
 local ACTION_UIDS = {
     [1] = "raynna-rotation-next-action",
@@ -3242,6 +3242,36 @@ local function DeepCopy(value, seen)
     return copy
 end
 
+function RaynnaRotationHelperResourceFadeAnimation(startType)
+    local fade = {
+        colorR = 1,
+        duration = "0.1",
+        alphaType = "straight",
+        colorA = 1,
+        colorG = 1,
+        alphaFunc = "function(progress, start, delta)\n    return start + (progress * delta)\nend\n",
+        use_alpha = true,
+        type = "custom",
+        easeType = "none",
+        scaley = 1,
+        alpha = 0,
+        y = 0,
+        x = 0,
+        scalex = 1,
+        preset = "fade",
+        easeStrength = 3,
+        rotate = 0,
+        colorB = 1,
+        duration_type = "seconds",
+    }
+    local start = DeepCopy(fade)
+    start.type = startType or "custom"
+    return {
+        start = start,
+        main = { type = "none", easeStrength = 3, duration_type = "seconds", easeType = "none" },
+        finish = DeepCopy(fade),
+    }
+end
 local function ResourceXOffset(index)
     return (index - 3) * 35
 end
@@ -3337,8 +3367,9 @@ local function BuildResourceFillAura(parentId, index, forceChild)
     }
     local resource = select(3, ComputeResourceInfo())
     FinalizeResourceClone(data, id, "raynna-rotation-cp-fill-" .. index, parentId)
-    data.color = ResourceColor(resource)
+    data.color = { 0.94509803921569, 0.019607843137255, 0, 1 }
     data.conditions = {}
+    data.animation = RaynnaRotationHelperResourceFadeAnimation("custom")
     data.rotate = true
     data.triggers = {
         {
@@ -3375,6 +3406,7 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     FinalizeResourceClone(data, id, "raynna-rotation-cp-black-outline-" .. index, parentId)
     data.color = { 0, 0, 0, 1 }
     data.conditions = {}
+    data.animation = RaynnaRotationHelperResourceFadeAnimation("none")
     data.rotate = true
     data.anchorFrameType = "SELECTFRAME"
     data.anchorFrameFrame = "WeakAuras:" .. RESOURCE_IDS[index]
@@ -3419,6 +3451,7 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
     data.foregroundColor = { 0.84705882352941, 0.89019607843137, 0.87843137254902, 1 }
     data.backgroundColor = { 0.23921568627451, 0.23921568627451, 0.23921568627451, 0 }
     data.conditions = {}
+    data.animation = RaynnaRotationHelperResourceFadeAnimation("none")
     data.rotate = true
     data.inverse = true
     data.orientation = "CLOCKWISE"
@@ -3476,6 +3509,9 @@ local function ClearGeneratedAuraData()
         WeakAurasSaved.displays[RESOURCE_IDS[i]] = nil
         WeakAurasSaved.displays[RESOURCE_OUTLINE_IDS[i]] = nil
         WeakAurasSaved.displays[RESOURCE_GCD_IDS[i]] = nil
+        WeakAurasSaved.displays[TARGET_ID .. " - Pip " .. i] = nil
+        WeakAurasSaved.displays[TARGET_ID .. " - Pip " .. i .. " BlackOutline"] = nil
+        WeakAurasSaved.displays[TARGET_ID .. " - Pip " .. i .. " GCD"] = nil
         WeakAurasSaved.displays[TARGET_ID .. " - CP " .. i] = nil
         WeakAurasSaved.displays[TARGET_ID .. " - CP" .. i .. "BlackOutline"] = nil
         WeakAurasSaved.displays[TARGET_ID .. " - CP" .. i .. "YellowOutline GCD"] = nil
