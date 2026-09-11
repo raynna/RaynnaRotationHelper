@@ -9,6 +9,19 @@ local THREAT_CHILD_ID = TARGET_ID .. " - Threat Action"
 local INTERRUPT_CHILD_ID = TARGET_ID .. " - Interrupt Action"
 local PET_CHILD_ID = TARGET_ID .. " - Pet Action"
 local UTILITY_CHILD_ID = TARGET_ID .. " - Utility Action"
+local GROUND_AOE_INDICATOR_IDS = {
+    BAD = TARGET_ID .. " - Ground AoE Bad",
+    OK = TARGET_ID .. " - Ground AoE OK",
+    GOOD = TARGET_ID .. " - Ground AoE Good",
+    BEST = TARGET_ID .. " - Ground AoE Best",
+}
+local GROUND_AOE_QUALITIES = { "BAD", "OK", "GOOD", "BEST" }
+local GROUND_AOE_COLORS = {
+    BAD = { 0.95, 0.12, 0.08, 1 },
+    OK = { 1, 0.45, 0.08, 1 },
+    GOOD = { 1, 0.88, 0.12, 1 },
+    BEST = { 0.12, 0.9, 0.28, 1 },
+}
 local RESOURCE_GROUP_ID = TARGET_ID .. " - Druid Combo points"
 local RESOURCE_IDS = {}
 local RESOURCE_OUTLINE_IDS = {}
@@ -25,6 +38,12 @@ local THREAT_CHILD_UID = "raynna-rotation-threat-action"
 local INTERRUPT_CHILD_UID = "raynna-rotation-interrupt-action"
 local PET_CHILD_UID = "raynna-rotation-pet-action"
 local UTILITY_CHILD_UID = "raynna-rotation-utility-action"
+local GROUND_AOE_INDICATOR_UIDS = {
+    BAD = "raynna-rotation-ground-aoe-bad",
+    OK = "raynna-rotation-ground-aoe-ok",
+    GOOD = "raynna-rotation-ground-aoe-good",
+    BEST = "raynna-rotation-ground-aoe-best",
+}
 
 local ADDON_NAME = "Raynna Rotation Helper"
 local MODE_AUTO = "auto"
@@ -136,6 +155,25 @@ function(event, ...)
 end
 ]=]
 
+
+local GROUND_AOE_TRIGGER_TEMPLATE = [=[
+function(event, ...)
+    if not _G.RaynnaRotationHelperGetGroundAoeQuality then
+        return false
+    end
+    local quality = _G.RaynnaRotationHelperGetGroundAoeQuality()
+    return quality == "%%QUALITY%%"
+end
+]=]
+
+local GROUND_AOE_NAME_SOURCE = [=[
+function()
+    if not _G.RaynnaRotationHelperGetGroundAoeLabel then
+        return ""
+    end
+    return _G.RaynnaRotationHelperGetGroundAoeLabel() or ""
+end
+]=]
 local GCD_DURATION_SOURCE = [=[
 function()
     local start, duration, enabled = GetSpellCooldown(61304)
@@ -2671,6 +2709,7 @@ local function BuildGroup(includeChildren)
     local children = {}
     if includeChildren then
         children = { CHILD_ID, ALT_CHILD_ID, DEFENSIVE_CHILD_ID, THREAT_CHILD_ID, INTERRUPT_CHILD_ID, PET_CHILD_ID, UTILITY_CHILD_ID }
+        for _, quality in ipairs(GROUND_AOE_QUALITIES) do table.insert(children, GROUND_AOE_INDICATOR_IDS[quality]) end
         if WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays["Druid Combo points"] then
             table.insert(children, "Druid Combo points")
         end
@@ -2851,6 +2890,62 @@ local function BuildAura(parentId, slot, forceChild)
     }
 end
 
+
+local function BuildGroundAoeIndicator(parentId, quality)
+    local color = GROUND_AOE_COLORS[quality] or { 1, 1, 1, 1 }
+    return {
+        id = GROUND_AOE_INDICATOR_IDS[quality],
+        uid = GROUND_AOE_INDICATOR_UIDS[quality],
+        parent = parentId,
+        regionType = "icon",
+        icon = true,
+        iconSource = -1,
+        displayIcon = "Interface\\Buttons\\WHITE8X8",
+        width = 34,
+        height = 34,
+        xOffset = parentId and 78 or 0,
+        yOffset = parentId and 28 or -120,
+        anchorPoint = "CENTER",
+        anchorFrameType = "SCREEN",
+        selfPoint = "CENTER",
+        frameStrata = 4,
+        alpha = 1,
+        zoom = 0,
+        color = color,
+        cooldown = false,
+        cooldownTextDisabled = true,
+        keepAspectRatio = true,
+        internalVersion = 90,
+        load = { use_petbattle = false, use_vehicleUi = false, use_never = false, class = { multi = {} }, class_and_spec = { multi = {} }, talent = { multi = {} }, spec = { multi = {} }, size = { multi = {} } },
+        triggers = {
+            {
+                trigger = {
+                    type = "custom",
+                    custom_type = "status",
+                    check = "update",
+                    onUpdateThrottle = 0.1,
+                    custom = GROUND_AOE_TRIGGER_TEMPLATE:gsub("%%%%QUALITY%%%%", quality),
+                    customName = GROUND_AOE_NAME_SOURCE,
+                    debuffType = "HELPFUL",
+                },
+                untrigger = {},
+            },
+            disjunctive = "any",
+            activeTriggerMode = -10,
+        },
+        subRegions = {
+            { type = "subbackground" },
+            { type = "subborder", border_visible = true, border_size = 2, border_offset = 1, border_edge = "Square Full White", border_color = { 0, 0, 0, 1 } },
+            { type = "subtext", text_text = "%n", text_visible = true, text_font = "Expressway", text_fontSize = 10, text_fontType = "OUTLINE", text_color = { 1, 1, 1, 1 }, text_shadowColor = { 0, 0, 0, 1 }, text_shadowXOffset = 1, text_shadowYOffset = -1, text_selfPoint = "AUTO", text_anchorXOffset = 0, text_anchorYOffset = 0, anchor_point = "CENTER", anchorXOffset = 0, anchorYOffset = 0, text_justify = "CENTER", text_wordWrap = "WordWrap", text_automaticWidth = "Auto", text_fixedWidth = 40, rotateText = "NONE" },
+        },
+        animation = { start = { type = "none" }, main = { type = "none" }, finish = { type = "none" } },
+        actions = { start = {}, init = {}, finish = {} },
+        conditions = {},
+        authorOptions = {},
+        config = {},
+        information = { showNilIsFalse = true, forceEvents = false, ignoreOptionsEventErrors = false },
+    }
+end
 local function ClearGeneratedTextFields(id)
     local data = WeakAurasSaved.displays[id]
     if data then
@@ -3079,6 +3174,7 @@ local function ClearGeneratedAuraData()
     WeakAurasSaved.displays[INTERRUPT_CHILD_ID] = nil
     WeakAurasSaved.displays[PET_CHILD_ID] = nil
     WeakAurasSaved.displays[UTILITY_CHILD_ID] = nil
+    for _, quality in ipairs(GROUND_AOE_QUALITIES) do WeakAurasSaved.displays[GROUND_AOE_INDICATOR_IDS[quality]] = nil end
     for i = 1, #RESOURCE_IDS do
         WeakAurasSaved.displays[RESOURCE_IDS[i]] = nil
         WeakAurasSaved.displays[RESOURCE_OUTLINE_IDS[i]] = nil
@@ -3267,7 +3363,7 @@ local function ShouldDisableRaynnaChild(id, data)
     if id == LEGACY_CHILD_ID or id == LEGACY_ALT_CHILD_ID then
         return true
     end
-    if id == CHILD_ID or id == ALT_CHILD_ID or id == DEFENSIVE_CHILD_ID or id == THREAT_CHILD_ID or id == INTERRUPT_CHILD_ID or id == PET_CHILD_ID or id == UTILITY_CHILD_ID or id == "Druid Combo points" or data.parent == "Druid Combo points" then
+    if id == CHILD_ID or id == ALT_CHILD_ID or id == DEFENSIVE_CHILD_ID or id == THREAT_CHILD_ID or id == INTERRUPT_CHILD_ID or id == PET_CHILD_ID or id == UTILITY_CHILD_ID or GROUND_AOE_INDICATOR_IDS.BAD == id or GROUND_AOE_INDICATOR_IDS.OK == id or GROUND_AOE_INDICATOR_IDS.GOOD == id or GROUND_AOE_INDICATOR_IDS.BEST == id or id == "Druid Combo points" or data.parent == "Druid Combo points" then
         return false
     end
     return id == "Highlight" or data.parent == "Highlight"
@@ -3285,6 +3381,7 @@ local function PatchLegacyFeralGroup(group)
     RemoveChild(group.controlledChildren, INTERRUPT_CHILD_ID)
     RemoveChild(group.controlledChildren, PET_CHILD_ID)
     RemoveChild(group.controlledChildren, UTILITY_CHILD_ID)
+    for _, quality in ipairs(GROUND_AOE_QUALITIES) do RemoveChild(group.controlledChildren, GROUND_AOE_INDICATOR_IDS[quality]) end
     AddExistingChild(group.controlledChildren, "Druid Combo points")
     AddExistingChild(group.controlledChildren, "Cooldowns")
     AddExistingChild(group.controlledChildren, "Highlight")
@@ -3297,6 +3394,7 @@ local function PatchLegacyFeralGroup(group)
     group.sortHybridTable[INTERRUPT_CHILD_ID] = nil
     group.sortHybridTable[PET_CHILD_ID] = nil
     group.sortHybridTable[UTILITY_CHILD_ID] = nil
+    for _, quality in ipairs(GROUND_AOE_QUALITIES) do group.sortHybridTable[GROUND_AOE_INDICATOR_IDS[quality]] = nil end
 
     local descendants = {}
     local changed = true
@@ -3497,16 +3595,68 @@ function _G.RaynnaRotationHelperGetSpellKeybind(spellID)
     return result
 end
 
+local function GroundAoeInfo(spellID)
+    spellID = spellID or select(1, ComputeRecommendations())
+    if not IsGroundTargetSpell(spellID) then
+        return nil
+    end
+    local ctx = BuildContext()
+    local targetCount = ctx.clusteredEnemyCount and ctx.clusteredEnemyCount(12) or 0
+    local selfCount = ctx.nearbyEnemyCount and ctx.nearbyEnemyCount(10) or 0
+    local count = targetCount
+    local place = "PACK"
+    if selfCount > targetCount then
+        count = selfCount
+        place = "SELF"
+    end
+
+    local quality = "BAD"
+    if count >= 4 then
+        quality = "BEST"
+    elseif count >= 3 then
+        quality = "GOOD"
+    elseif count >= 2 then
+        quality = "OK"
+    end
+
+    return quality, count, place, IsGroundTargetingSpell(spellID)
+end
+
+local function GroundTargetPlacementLabel(spellID)
+    local quality, count, place, targeting = GroundAoeInfo(spellID)
+    if not quality then
+        return nil
+    end
+    if targeting then
+        return "PLACE\n" .. place .. " " .. tostring(count)
+    end
+    return quality .. " " .. tostring(count)
+end
+
+function _G.RaynnaRotationHelperGetGroundAoeQuality()
+    local quality = GroundAoeInfo()
+    return quality
+end
+
+function _G.RaynnaRotationHelperGetGroundAoeLabel()
+    local quality, count, place, targeting = GroundAoeInfo()
+    if not quality then
+        return ""
+    end
+    if targeting then
+        return place .. "\n" .. tostring(count)
+    end
+    return quality .. "\n" .. tostring(count)
+end
+
 function _G.RaynnaRotationHelperGetSpellLabel(spellID)
     local binding = _G.RaynnaRotationHelperGetSpellKeybind(spellID) or ""
     if IsGroundTargetSpell(spellID) then
-        if IsGroundTargetingSpell(spellID) then
-            return "PLACE"
+        local placement = GroundTargetPlacementLabel(spellID) or "AREA"
+        if binding ~= "" and not IsGroundTargetingSpell(spellID) then
+            return binding .. "\n" .. placement
         end
-        if binding ~= "" then
-            return binding .. "\nAREA"
-        end
-        return "AREA"
+        return placement
     end
     return binding
 end
@@ -3675,6 +3825,7 @@ local function Install()
     ClearGeneratedTextFields(PET_CHILD_ID)
     SafeWeakAurasAdd(BuildAura(nil, 7, true))
     ClearGeneratedTextFields(UTILITY_CHILD_ID)
+    for _, quality in ipairs(GROUND_AOE_QUALITIES) do SafeWeakAurasAdd(BuildGroundAoeIndicator(nil, quality)) end
     PatchDynamicResourceGroup()
 
     C_Timer.After(0.1, function()
@@ -3692,6 +3843,7 @@ local function Install()
         ClearGeneratedTextFields(PET_CHILD_ID)
         SafeWeakAurasAdd(BuildAura(TARGET_ID, 7))
         ClearGeneratedTextFields(UTILITY_CHILD_ID)
+        for _, quality in ipairs(GROUND_AOE_QUALITIES) do SafeWeakAurasAdd(BuildGroundAoeIndicator(TARGET_ID, quality)) end
         PatchDynamicResourceGroup()
         SafeWeakAurasAdd(BuildGroup(true))
         WeakAuras.ScanEvents("PLAYER_TARGET_CHANGED")
