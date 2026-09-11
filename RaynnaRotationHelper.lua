@@ -3361,6 +3361,47 @@ local function RemoveChild(children, childId)
     end
 end
 
+local function ChildListed(group, childId)
+    if not group or not group.controlledChildren then
+        return false
+    end
+    for _, existing in ipairs(group.controlledChildren) do
+        if existing == childId then
+            return true
+        end
+    end
+    return false
+end
+
+local function SanitizeWeakAurasHierarchy()
+    local displays = WeakAurasSaved and WeakAurasSaved.displays
+    if not displays then
+        return
+    end
+    for id, data in pairs(displays) do
+        if data and data.controlledChildren then
+            for i = #data.controlledChildren, 1, -1 do
+                local childId = data.controlledChildren[i]
+                local child = displays[childId]
+                if not child or child.parent ~= id then
+                    table.remove(data.controlledChildren, i)
+                    if data.sortHybridTable then
+                        data.sortHybridTable[childId] = nil
+                    end
+                end
+            end
+        end
+    end
+    for id, data in pairs(displays) do
+        if data and data.parent then
+            local parent = displays[data.parent]
+            if not ChildListed(parent, id) then
+                data.parent = nil
+            end
+        end
+    end
+end
+
 local function SetLegacyFeralLoad(data)
     data.load = data.load or {}
     data.load.use_class = true
@@ -3398,7 +3439,6 @@ local function PatchLegacyFeralGroup(group)
     for _, quality in ipairs(GROUND_AOE_QUALITIES) do RemoveChild(group.controlledChildren, GROUND_AOE_INDICATOR_IDS[quality]) end
     RemoveChild(group.controlledChildren, RESOURCE_GROUP_ID)
     for _, oldGroupId in ipairs(OLD_RESOURCE_GROUP_IDS) do RemoveChild(group.controlledChildren, oldGroupId) end
-    AddExistingChild(group.controlledChildren, "Druid Combo points")
     AddExistingChild(group.controlledChildren, "Cooldowns")
     AddExistingChild(group.controlledChildren, "Highlight")
     group.sortHybridTable[LEGACY_CHILD_ID] = nil
@@ -3954,6 +3994,7 @@ local function Install()
         for _, quality in ipairs(GROUND_AOE_QUALITIES) do SafeWeakAurasAdd(BuildGroundAoeIndicator(TARGET_ID, quality)) end
         InstallResourcePips(TARGET_ID)
         SafeWeakAurasAdd(BuildGroup(true))
+        SanitizeWeakAurasHierarchy()
         WeakAuras.ScanEvents("PLAYER_TARGET_CHANGED")
         print("|cff66ccff" .. ADDON_NAME .. ":|r patched group '" .. TARGET_ID .. "'.")
     end)
