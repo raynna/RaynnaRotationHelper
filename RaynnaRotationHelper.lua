@@ -3242,6 +3242,10 @@ local function DeepCopy(value, seen)
     return copy
 end
 
+local function BundledPipTemplate(id)
+    local template = _G.RaynnaRotationHelperPipTemplate or RaynnaRotationHelperPipTemplate
+    return template and template[id]
+end
 function RaynnaRotationHelperResourceFadeAnimation(startType)
     local fade = {
         colorR = 1,
@@ -3320,12 +3324,13 @@ local function FinalizeResourceClone(data, id, uid, parentId)
     data.version = nil
     data.tocversion = nil
     data.source = nil
+    data.desc = nil
     data.preferToUpdate = false
     return data
 end
 
 local function BuildResourceGroup(parentId, includeChildren)
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays["Druid Combo points"]
+    local source = BundledPipTemplate(RESOURCE_GROUP_ID) or (WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays["Druid Combo points"])
     if not source then
         return ResourceFallbackGroup(parentId, includeChildren)
     end
@@ -3348,7 +3353,7 @@ local function BuildResourceFillAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_IDS[index] or TARGET_ID
     local sourceIds = { "CP 1", "CP 2", "CP 3", "CP 4", "CP 5" }
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]]
+    local source = BundledPipTemplate(RESOURCE_IDS[index]) or (WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]])
     local data = source and DeepCopy(source) or {
         regionType = "texture",
         texture = "Interface\\AddOns\\WeakAuras\\Media\\Textures\\Circle_Smooth_Border",
@@ -3386,7 +3391,7 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_OUTLINE_IDS[index] or TARGET_ID
     local sourceIds = { "CP1BlackOutline", "CP2BlackOutline", "CP3BlackOutline", "CP4BlackOutline", "CP5BlackOutline" }
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]]
+    local source = BundledPipTemplate(RESOURCE_OUTLINE_IDS[index]) or (WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]])
     local data = source and DeepCopy(source) or {
         regionType = "texture",
         texture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
@@ -3427,7 +3432,7 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_GCD_IDS[index] or TARGET_ID
     local sourceIds = { "CP1YellowOutline GCD", "CP2YellowOutline GCD", "CP3YellowOutline GCD", "CP4YellowOutline GCD", "CP5YellowOutline GCD" }
-    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]]
+    local source = BundledPipTemplate(RESOURCE_GCD_IDS[index]) or (WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]])
     local data = source and DeepCopy(source) or {
         regionType = "progresstexture",
         texture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
