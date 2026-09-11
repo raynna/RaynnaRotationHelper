@@ -1529,6 +1529,21 @@ local function HunterSerpentSting(ctx, refreshWindow)
     return nil
 end
 
+local function HunterArcaneShot(ctx, focus, minFocus)
+    focus = focus or ctx.power(ctx.focusType)
+    if focus >= (minFocus or 30) and ctx.ready(3044, 30, ctx.focusType) and ctx.inRange(3044) then
+        return 3044
+    end
+    return nil
+end
+
+local function HunterMarkingShot(ctx, focus)
+    if ctx.debuffRem("target", 1130, false) <= 0 then
+        return HunterArcaneShot(ctx, focus, 30)
+    end
+    return nil
+end
+
 local function HunterFocusBuilder(ctx)
     return ctx.readyAnyInRange(77767, 56641)
 end
@@ -1536,10 +1551,12 @@ end
 local function HunterFallback(ctx, focus, dumpFocus)
     focus = focus or 0
     dumpFocus = dumpFocus or 60
-    if focus >= dumpFocus and ctx.ready(3044, 30, ctx.focusType) and ctx.inRange(3044) then return 3044 end
+    local arcane = HunterArcaneShot(ctx, focus, dumpFocus)
+    if arcane then return arcane end
+    arcane = HunterArcaneShot(ctx, focus, 30)
+    if arcane then return arcane end
     local builder = HunterFocusBuilder(ctx)
     if builder then return builder end
-    if focus >= 30 and ctx.ready(3044, 30, ctx.focusType) and ctx.inRange(3044) then return 3044 end
     if ctx.readyInRange(75) then return 75 end
     return nil
 end
@@ -1561,6 +1578,8 @@ RegisterRotation("HUNTER:1", {
         local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
         local freshSerpent = HunterSerpentSting(ctx, 0)
         if freshSerpent then return freshSerpent end
+        local marking = HunterMarkingShot(ctx, focus)
+        if marking then return marking end
         if ctx.petAlive() and ctx.ready(34026, 40, ctx.focusType) and ctx.inRange(34026) then return 34026 end
         if ctx.targetHpPct() <= 20 and ctx.ready(53351) and ctx.inRange(53351) then return 53351 end
         local serpent = HunterSerpentSting(ctx, 3)
@@ -1592,8 +1611,9 @@ RegisterRotation("HUNTER:2", {
         local aimedProc = ctx.buffRem("player", 82925) > 0
         local freshSerpent = HunterSerpentSting(ctx, 0)
         if freshSerpent then return freshSerpent end
+        local marking = HunterMarkingShot(ctx, focus)
+        if marking then return marking end
         if aimedProc and ctx.ready(19434) and ctx.inRange(19434) then return 19434 end
-        if ctx.buffRem("player", 53220) <= 5 and ctx.ready(56641) and ctx.inRange(56641) then return 56641 end
         if enemies < 10 and ctx.ready(53209, 45, ctx.focusType) and ctx.inRange(53209) then return 53209 end
         if enemies >= 4 and focus >= 40 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
         local serpent = HunterSerpentSting(ctx, 3)
@@ -1602,6 +1622,7 @@ RegisterRotation("HUNTER:2", {
         local talent = HunterTalent(ctx)
         if talent then return talent end
         if (targetHp >= 80 or focus >= 75 or ctx.buffRem("player", 3045) > 0 or ctx.buffRem("player", 2825, 80353) > 0) and ctx.ready(19434, 50, ctx.focusType) and ctx.inRange(19434) then return 19434 end
+        if focus <= 45 and ctx.buffRem("player", 53220) <= 5 and ctx.ready(56641) and ctx.inRange(56641) then return 56641 end
         return HunterFallback(ctx, focus, 65)
     end,
 })
@@ -1622,6 +1643,8 @@ RegisterRotation("HUNTER:3", {
         local lockAndLoad = ctx.buffRem("player", 56453) > 0
         local freshSerpent = HunterSerpentSting(ctx, 0)
         if freshSerpent then return freshSerpent end
+        local marking = HunterMarkingShot(ctx, focus)
+        if marking then return marking end
         if enemies >= 4 and focus >= 40 and ctx.debuffRem("target", 1978, true) <= 0 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
         if (enemies < 6 or lockAndLoad) and ctx.ready(53301, 25, ctx.focusType) and ctx.inRange(53301) then return 53301 end
         if ctx.targetHpPct() <= 20 and ctx.ready(53351) and ctx.inRange(53351) then return 53351 end
