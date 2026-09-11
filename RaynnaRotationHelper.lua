@@ -2978,7 +2978,7 @@ local function BuildGroup(includeChildren)
         alpha = 1,
         scale = 1,
         load = { use_petbattle = false, use_vehicleUi = false, use_never = false, class = { multi = {} }, spec = { multi = {} }, size = { multi = {} }, talent = { multi = {} } },
-        triggers = { { trigger = { type = "aura2", event = "Health", unit = "player", debuffType = "HELPFUL", names = {}, spellIds = {} }, untrigger = {} } },
+        triggers = { { trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
         animation = { start = { type = "none" }, main = { type = "none" }, finish = { type = "none" } },
         actions = { start = {}, init = {}, finish = {} },
         conditions = {},
@@ -3259,8 +3259,8 @@ local function ResourceFallbackGroup(parentId, includeChildren)
         parent = parentId,
         regionType = "group",
         controlledChildren = children,
-        xOffset = -323.63379956615,
-        yOffset = -67.929352127084,
+        xOffset = -320.7607084057289,
+        yOffset = 163.3597575043273,
         anchorPoint = "CENTER",
         anchorFrameType = "SCREEN",
         selfPoint = "BOTTOMLEFT",
@@ -3268,7 +3268,7 @@ local function ResourceFallbackGroup(parentId, includeChildren)
         alpha = 1,
         scale = 0.55,
         load = GenericLoad(),
-        triggers = { { trigger = { type = "aura2", event = "Health", unit = "player", debuffType = "HELPFUL", names = {}, spellIds = {} }, untrigger = {} } },
+        triggers = { { trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
         animation = { start = { type = "none" }, main = { type = "none" }, finish = { type = "none" } },
         actions = { start = {}, init = {}, finish = {} },
         conditions = {},
@@ -3295,13 +3295,31 @@ local function FinalizeResourceClone(data, id, uid, parentId)
 end
 
 local function BuildResourceGroup(parentId, includeChildren)
-    return ResourceFallbackGroup(parentId, includeChildren)
+    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays["Druid Combo points"]
+    if not source then
+        return ResourceFallbackGroup(parentId, includeChildren)
+    end
+    local data = DeepCopy(source)
+    local children = {}
+    if includeChildren then
+        for i = 1, #RESOURCE_IDS do table.insert(children, RESOURCE_IDS[i]) end
+        for i = 1, #RESOURCE_OUTLINE_IDS do table.insert(children, RESOURCE_OUTLINE_IDS[i]) end
+        for i = 1, #RESOURCE_GCD_IDS do table.insert(children, RESOURCE_GCD_IDS[i]) end
+    end
+    FinalizeResourceClone(data, RESOURCE_GROUP_ID, "raynna-rotation-resource-group", parentId)
+    data.controlledChildren = children
+    data.sortHybridTable = nil
+    data.triggers = { { trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 }
+    data.load = GenericLoad()
+    return data
 end
 
 local function BuildResourceFillAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_IDS[index] or TARGET_ID
-    local data = {
+    local sourceIds = { "CP 1", "CP 2", "CP 3", "CP 4", "CP 5" }
+    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]]
+    local data = source and DeepCopy(source) or {
         regionType = "texture",
         texture = "Interface\\AddOns\\WeakAuras\\Media\\Textures\\Circle_Smooth_Border",
         textureWrapMode = "CLAMP",
@@ -3313,13 +3331,15 @@ local function BuildResourceFillAura(parentId, index, forceChild)
         anchorPoint = "CENTER",
         anchorFrameType = "SCREEN",
         selfPoint = "CENTER",
-        frameStrata = 3,
+        frameStrata = 1,
         alpha = 1,
         subRegions = { { type = "subbackground" } },
     }
     local resource = select(3, ComputeResourceInfo())
     FinalizeResourceClone(data, id, "raynna-rotation-cp-fill-" .. index, parentId)
     data.color = ResourceColor(resource)
+    data.conditions = {}
+    data.rotate = true
     data.triggers = {
         {
             trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), debuffType = "HELPFUL" },
@@ -3334,7 +3354,9 @@ end
 local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_OUTLINE_IDS[index] or TARGET_ID
-    local data = {
+    local sourceIds = { "CP1BlackOutline", "CP2BlackOutline", "CP3BlackOutline", "CP4BlackOutline", "CP5BlackOutline" }
+    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]]
+    local data = source and DeepCopy(source) or {
         regionType = "texture",
         texture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
         textureWrapMode = "CLAMP",
@@ -3352,6 +3374,12 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     }
     FinalizeResourceClone(data, id, "raynna-rotation-cp-black-outline-" .. index, parentId)
     data.color = { 0, 0, 0, 1 }
+    data.conditions = {}
+    data.rotate = true
+    data.anchorFrameType = "SELECTFRAME"
+    data.anchorFrameFrame = "WeakAuras:" .. RESOURCE_IDS[index]
+    data.xOffset = 0
+    data.yOffset = 0
     data.triggers = {
         {
             trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), debuffType = "HELPFUL" },
@@ -3366,7 +3394,9 @@ end
 local function BuildResourceGcdAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_GCD_IDS[index] or TARGET_ID
-    local data = {
+    local sourceIds = { "CP1YellowOutline GCD", "CP2YellowOutline GCD", "CP3YellowOutline GCD", "CP4YellowOutline GCD", "CP5YellowOutline GCD" }
+    local source = WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays[sourceIds[index]]
+    local data = source and DeepCopy(source) or {
         regionType = "progresstexture",
         texture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
         foregroundTexture = "Interface\\Addons\\WeakAuras\\PowerAurasMedia\\Auras\\Aura73",
@@ -3380,11 +3410,22 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
         anchorPoint = "CENTER",
         anchorFrameType = "SCREEN",
         selfPoint = "CENTER",
-        frameStrata = 3,
+        frameStrata = 4,
         alpha = 1,
         subRegions = {},
     }
     FinalizeResourceClone(data, id, "raynna-rotation-cp-yellow-gcd-" .. index, parentId)
+    data.color = { 1, 0.91764705882353, 0, 1 }
+    data.foregroundColor = { 0.84705882352941, 0.89019607843137, 0.87843137254902, 1 }
+    data.backgroundColor = { 0.23921568627451, 0.23921568627451, 0.23921568627451, 0 }
+    data.conditions = {}
+    data.rotate = true
+    data.inverse = true
+    data.orientation = "CLOCKWISE"
+    data.anchorFrameType = "SELECTFRAME"
+    data.anchorFrameFrame = "WeakAuras:" .. RESOURCE_IDS[index]
+    data.xOffset = 0
+    data.yOffset = 0
     data.triggers = {
         {
             trigger = {
