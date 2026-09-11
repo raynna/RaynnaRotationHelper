@@ -1522,6 +1522,13 @@ local function HunterTalent(ctx)
     return nil
 end
 
+local function HunterSerpentSting(ctx, refreshWindow)
+    if ctx.debuffRem("target", 1978, true) <= (refreshWindow or 3) and ctx.ready(1978, 15, ctx.focusType) and ctx.inRange(1978) then
+        return 1978
+    end
+    return nil
+end
+
 local function HunterFocusBuilder(ctx)
     return ctx.readyAnyInRange(77767, 56641)
 end
@@ -1552,9 +1559,12 @@ RegisterRotation("HUNTER:1", {
         local focus = ctx.power(ctx.focusType)
         local bossTarget = ctx.targetIsBoss()
         local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
+        local freshSerpent = HunterSerpentSting(ctx, 0)
+        if freshSerpent then return freshSerpent end
         if ctx.petAlive() and ctx.ready(34026, 40, ctx.focusType) and ctx.inRange(34026) then return 34026 end
         if ctx.targetHpPct() <= 20 and ctx.ready(53351) and ctx.inRange(53351) then return 53351 end
-        if ctx.debuffRem("target", 1978, true) <= 3 and ctx.ready(1978, 15, ctx.focusType) and ctx.inRange(1978) then return 1978 end
+        local serpent = HunterSerpentSting(ctx, 3)
+        if serpent then return serpent end
         if bossTarget and inCombat and ctx.petAlive() and ctx.ready(19574) then return 19574 end
         if ctx.petAlive() and ctx.buffStacks("pet", 19615) >= 5 and ctx.ready(82692) then return 82692 end
         local talent = HunterTalent(ctx)
@@ -1580,11 +1590,14 @@ RegisterRotation("HUNTER:2", {
         local focus = ctx.power(ctx.focusType)
         local targetHp = ctx.targetHpPct()
         local aimedProc = ctx.buffRem("player", 82925) > 0
+        local freshSerpent = HunterSerpentSting(ctx, 0)
+        if freshSerpent then return freshSerpent end
         if aimedProc and ctx.ready(19434) and ctx.inRange(19434) then return 19434 end
         if ctx.buffRem("player", 53220) <= 5 and ctx.ready(56641) and ctx.inRange(56641) then return 56641 end
         if enemies < 10 and ctx.ready(53209, 45, ctx.focusType) and ctx.inRange(53209) then return 53209 end
         if enemies >= 4 and focus >= 40 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
-        if ctx.debuffRem("target", 1978, true) <= 3 and ctx.ready(1978, 15, ctx.focusType) and ctx.inRange(1978) then return 1978 end
+        local serpent = HunterSerpentSting(ctx, 3)
+        if serpent then return serpent end
         if targetHp <= 20 and ctx.ready(53351) and ctx.inRange(53351) then return 53351 end
         local talent = HunterTalent(ctx)
         if talent then return talent end
@@ -1607,12 +1620,15 @@ RegisterRotation("HUNTER:3", {
         local enemies = ctx.enemyCount()
         local focus = ctx.power(ctx.focusType)
         local lockAndLoad = ctx.buffRem("player", 56453) > 0
+        local freshSerpent = HunterSerpentSting(ctx, 0)
+        if freshSerpent then return freshSerpent end
         if enemies >= 4 and focus >= 40 and ctx.debuffRem("target", 1978, true) <= 0 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
         if (enemies < 6 or lockAndLoad) and ctx.ready(53301, 25, ctx.focusType) and ctx.inRange(53301) then return 53301 end
         if ctx.targetHpPct() <= 20 and ctx.ready(53351) and ctx.inRange(53351) then return 53351 end
         if ctx.debuffRem("target", 3674, true) <= 3 and ctx.ready(3674, 35, ctx.focusType) and ctx.inRange(3674) then return 3674 end
         if enemies >= 2 and focus >= 40 and ctx.ready(2643, 40, ctx.focusType) and ctx.inRange(2643) then return 2643 end
-        if ctx.debuffRem("target", 1978, true) <= 3 and ctx.ready(1978, 15, ctx.focusType) and ctx.inRange(1978) then return 1978 end
+        local serpent = HunterSerpentSting(ctx, 3)
+        if serpent then return serpent end
         local talent = HunterTalent(ctx)
         if talent then return talent end
         return HunterFallback(ctx, focus, 65)
@@ -3891,6 +3907,13 @@ local function PrintActionBarDebug()
     if module and module.name == "Feral Druid" then
         local behind = ctx.behindTarget()
         print("|cff66ccff" .. ADDON_NAME .. ":|r behind target " .. tostring(behind) .. " (" .. (ctx.behindDebug or "no debug") .. ")")
+    end
+    if ctx.class == "HUNTER" then
+        local serpentRem = ctx.debuffRem("target", 1978, true)
+        local serpentReady = ctx.ready(1978, 15, ctx.focusType)
+        local serpentRange = ctx.inRange(1978)
+        local focus = ctx.power(ctx.focusType)
+        print("|cff66ccff" .. ADDON_NAME .. ":|r hunter serpent rem=" .. tostring(serpentRem) .. " ready=" .. tostring(serpentReady) .. " range=" .. tostring(serpentRange) .. " focus=" .. tostring(focus) .. "/" .. tostring(ctx.powerMax(ctx.focusType)) .. " rangeDebug=" .. tostring(ctx.rangeDebug or "none"))
     end
     PrintButtonMatches("primary", spellID)
     PrintButtonMatches("alternate", altSpellID)
