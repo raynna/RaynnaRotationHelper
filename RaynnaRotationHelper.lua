@@ -276,7 +276,7 @@ function(event, ...)
     if UnitExists and UnitExists("target") then
         return true
     end
-    return (count or 0) > 0
+    return (count or 0) >= %%INDEX%%
 end
 ]=]
 
@@ -3397,14 +3397,14 @@ local function BuildResourceFillAura(parentId, index, forceChild)
         textureWrapMode = "CLAMP",
         blendMode = "BLEND",
         width = 7,
-        height = 24,
+        height = 1,
         xOffset = ResourceXOffset(index),
         yOffset = -14,
         anchorPoint = "BOTTOM",
         anchorFrameType = "SCREEN",
         selfPoint = "BOTTOM",
         frameStrata = 4,
-        alpha = 1,
+        alpha = 0,
         color = ResourceColor(resource),
         rotate = false,
         scalex = 1,
@@ -3413,13 +3413,13 @@ local function BuildResourceFillAura(parentId, index, forceChild)
         load = GenericLoad(),
         triggers = {
             {
-                trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
+                trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
                 untrigger = {},
             },
             disjunctive = "all",
             activeTriggerMode = -10,
         },
-        animation = RaynnaRotationHelperResourceFadeAnimation("custom"),
+        animation = RaynnaRotationHelperResourceFadeAnimation("none"),
         actions = { start = {}, init = {}, finish = {} },
         conditions = {},
         subRegions = { { type = "subbackground" } },
@@ -4162,26 +4162,85 @@ local function WeakAuraRegion(id)
     return _G["WeakAuras:" .. id]
 end
 
-local function SetResourceFillAlpha(alpha)
-    for i = 1, #RESOURCE_IDS do
-        local region = WeakAuraRegion(RESOURCE_IDS[i])
-        if region and region.SetAlpha then
-            region:SetAlpha(alpha)
+local RESOURCE_FILL_FULL_HEIGHT = 24
+local RESOURCE_FILL_EMPTY_HEIGHT = 0.5
+local RESOURCE_FILL_SPEED = 150
+local RESOURCE_MAX_FLASH_SECONDS = 0.55
+local resourceFillHeights = {}
+local lastResourceCount = 0
+local resourceMaxFlashUntil = 0
+
+local function SetTextureColor(region, color)
+    if region and color then
+        if region.Color then
+            region:Color(color[1], color[2], color[3], color[4])
+        elseif region.texture and region.texture.SetVertexColor then
+            region.texture:SetVertexColor(color[1], color[2], color[3], color[4])
         end
     end
 end
 
-local function UpdateResourcePulse()
-    local count, _, resource, _, remaining = ComputeResourceInfo()
-    if resource ~= "ARCANE_CHARGES" or not remaining or remaining == math.huge or remaining > 4 or (count or 0) <= 0 then
-        SetResourceFillAlpha(1)
-        return
+local function SetResourceFillHeight(region, height)
+    if not region then return end
+    if region.SetRegionHeight then
+        region:SetRegionHeight(height)
+    elseif region.SetHeight then
+        region:SetHeight(height)
     end
-    local pulse = 0.55 + 0.45 * math.abs(math.sin(GetTime() * 4))
+end
+
+local function UpdateResourceVisuals(elapsed)
+    local count, maxCount, resource, _, remaining = ComputeResourceInfo()
+    count = count or 0
+    maxCount = maxCount or 0
+    elapsed = elapsed or 0.05
+
+    local now = GetTime and GetTime() or 0
+    if maxCount > 0 and count >= maxCount and (lastResourceCount or 0) < maxCount then
+        resourceMaxFlashUntil = now + RESOURCE_MAX_FLASH_SECONDS
+    end
+    lastResourceCount = count
+
+    local baseColor = ResourceColor(resource)
+    local borderColor = ResourceColor(resource)
+    borderColor[4] = 0.32
+    local flashRemaining = resourceMaxFlashUntil - now
+    local flashActive = flashRemaining > 0
+    local flashAlpha = flashActive and math.max(0.18, math.min(1, flashRemaining / RESOURCE_MAX_FLASH_SECONDS)) or 0
+
     for i = 1, #RESOURCE_IDS do
-        local region = WeakAuraRegion(RESOURCE_IDS[i])
-        if region and region.SetAlpha then
-            region:SetAlpha(i <= count and pulse or 1)
+        local fill = WeakAuraRegion(RESOURCE_IDS[i])
+        local target = (i <= count) and RESOURCE_FILL_FULL_HEIGHT or RESOURCE_FILL_EMPTY_HEIGHT
+        local current = resourceFillHeights[i]
+        if current == nil then current = target end
+        local step = RESOURCE_FILL_SPEED * elapsed
+        if current < target then
+            current = math.min(target, current + step)
+        elseif current > target then
+            current = math.max(target, current - step)
+        end
+        resourceFillHeights[i] = current
+
+        if fill then
+            SetResourceFillHeight(fill, current)
+            if fill.SetAlpha then
+                local alpha = current <= RESOURCE_FILL_EMPTY_HEIGHT + 0.01 and 0 or 1
+                if resource == "ARCANE_CHARGES" and remaining and remaining ~= math.huge and remaining <= 4 and i <= count then
+                    alpha = math.max(0.5, 0.55 + 0.45 * math.abs(math.sin(now * 4)))
+                end
+                fill:SetAlpha(alpha)
+            end
+            baseColor[4] = 1
+            SetTextureColor(fill, baseColor)
+        end
+
+        local border = WeakAuraRegion(RESOURCE_GCD_IDS[i])
+        if border then
+            if flashActive and i <= maxCount then
+                SetTextureColor(border, { 1, 0.82, 0.18, 0.38 + 0.62 * flashAlpha })
+            else
+                SetTextureColor(border, borderColor)
+            end
         end
     end
 end
@@ -4191,10 +4250,11 @@ glowFrame:SetScript("OnUpdate", function(self, elapsed)
     if self.elapsed < 0.05 then
         return
     end
+    local tick = self.elapsed
     self.elapsed = 0
     UpdateActionBarGlow()
     UpdateHealFrameGlow()
-    UpdateResourcePulse()
+    UpdateResourceVisuals(tick)
 end)
 
 local function Install()
@@ -4433,7 +4493,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     if event == "COMBAT_LOG_EVENT_UNFILTERED" then
         TrackCombatLogHostileAttacker(...)
         UpdateActionBarGlow()
-        UpdateResourcePulse()
+        UpdateResourceVisuals(0.05)
         if WeakAuras and WeakAuras.ScanEvents then
             WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
         end
@@ -4467,7 +4527,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end
     UpdateActionBarGlow()
     UpdateHealFrameGlow()
-    UpdateResourcePulse()
+    UpdateResourceVisuals(0.05)
     if WeakAuras and WeakAuras.ScanEvents then
         WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
     end
