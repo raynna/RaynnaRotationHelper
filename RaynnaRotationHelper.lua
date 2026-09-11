@@ -3305,9 +3305,9 @@ local SafeWeakAurasAdd
 local function InstallResourcePips(parentId)
     SafeWeakAurasAdd(BuildResourceGroup(parentId, true))
     for i = 1, #RESOURCE_IDS do
-        SafeWeakAurasAdd(BuildResourceFillAura(parentId, i, true))
-        SafeWeakAurasAdd(BuildResourceBlackOutlineAura(parentId, i, true))
-        SafeWeakAurasAdd(BuildResourceGcdAura(parentId, i, true))
+        SafeWeakAurasAdd(BuildResourceFillAura(RESOURCE_GROUP_ID, i, true))
+        SafeWeakAurasAdd(BuildResourceBlackOutlineAura(RESOURCE_GROUP_ID, i, true))
+        SafeWeakAurasAdd(BuildResourceGcdAura(RESOURCE_GROUP_ID, i, true))
     end
 end
 local function ClearGeneratedAuraData()
