@@ -939,16 +939,18 @@ local function BuildContext()
         return best > 0 and best or nil
     end
     function ctx.arcaneCharges()
-        local buffCharges = ctx.arcaneChargeBuffStacks()
         local powerType = SPELL_POWER_ARCANE_CHARGES or (Enum and Enum.PowerType and Enum.PowerType.ArcaneCharges) or 16
-        local powerCharges = UnitPower and UnitPower("player", powerType) or 0
-        return math.max(buffCharges or 0, powerCharges or 0)
+        local powerMax = UnitPowerMax and UnitPowerMax("player", powerType) or 0
+        if UnitPower and powerMax and powerMax > 0 then
+            return UnitPower("player", powerType) or 0
+        end
+        return ctx.arcaneChargeBuffStacks()
     end
 
     function ctx.arcaneChargesMax()
         local powerType = SPELL_POWER_ARCANE_CHARGES or (Enum and Enum.PowerType and Enum.PowerType.ArcaneCharges) or 16
         local powerMax = UnitPowerMax and UnitPowerMax("player", powerType) or 0
-        return math.max(powerMax or 0, 4)
+        return powerMax and powerMax > 0 and powerMax or 4
     end
 
     ctx.focusType = Enum and Enum.PowerType and Enum.PowerType.Focus or 2
@@ -3408,10 +3410,10 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     data.conditions = {}
     data.animation = RaynnaRotationHelperResourceFadeAnimation("none")
     data.rotate = true
-    data.anchorFrameType = "SELECTFRAME"
-    data.anchorFrameFrame = "WeakAuras:" .. RESOURCE_IDS[index]
-    data.xOffset = 0
-    data.yOffset = 0
+    data.anchorFrameType = "SCREEN"
+    data.anchorFrameFrame = nil
+    data.xOffset = ResourceXOffset(index)
+    data.yOffset = -165
     data.triggers = {
         {
             trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
@@ -4131,9 +4133,8 @@ local function WeakAuraRegion(id)
 end
 
 local function UpdateResourcePipVisuals()
-    local count, maxCount, resource, _, remaining = ComputeResourceInfo()
+    local count, _, resource, _, remaining = ComputeResourceInfo()
     count = math.max(0, math.min(tonumber(count) or 0, #RESOURCE_IDS))
-    maxCount = math.max(0, math.min(tonumber(maxCount) or 0, #RESOURCE_IDS))
     local fillColor = ResourceColor(resource)
     local pulse = 1
     if resource == "ARCANE_CHARGES" and remaining and remaining ~= math.huge and remaining <= 4 and count > 0 then
@@ -4142,53 +4143,9 @@ local function UpdateResourcePipVisuals()
 
     for i = 1, #RESOURCE_IDS do
         local fill = WeakAuraRegion(RESOURCE_IDS[i])
-        local outline = WeakAuraRegion(RESOURCE_OUTLINE_IDS[i])
-        local gcd = WeakAuraRegion(RESOURCE_GCD_IDS[i])
-        local slotShown = i <= maxCount
-        local filled = i <= count
-
-        if outline then
-            if slotShown then
-                if outline.Show then
-                    outline:Show()
-                end
-                if outline.SetAlpha then
-                    outline:SetAlpha(1)
-                end
-            else
-                if outline.SetAlpha then
-                    outline:SetAlpha(0)
-                end
-                if outline.Hide then
-                    outline:Hide()
-                end
-            end
-            if outline.SetColor then
-                outline:SetColor(0, 0, 0, 1)
-            end
-            if outline.SetVertexColor then
-                outline:SetVertexColor(0, 0, 0, 1)
-            end
-            if outline.texture and outline.texture.SetVertexColor then
-                outline.texture:SetVertexColor(0, 0, 0, 1)
-            end
-        end
-
         if fill then
-            if filled then
-                if fill.Show then
-                    fill:Show()
-                end
-                if fill.SetAlpha then
-                    fill:SetAlpha(pulse)
-                end
-            else
-                if fill.SetAlpha then
-                    fill:SetAlpha(0)
-                end
-                if fill.Hide then
-                    fill:Hide()
-                end
+            if fill.SetAlpha then
+                fill:SetAlpha(i <= count and pulse or 1)
             end
             if fill.SetColor then
                 fill:SetColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
@@ -4201,27 +4158,6 @@ local function UpdateResourcePipVisuals()
             end
             if fill.icon and fill.icon.SetVertexColor then
                 fill.icon:SetVertexColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
-            end
-        end
-
-        if gcd then
-            if slotShown then
-                if gcd.SetColor then
-                    gcd:SetColor(1, 0.91764705882353, 0, 1)
-                end
-                if gcd.SetVertexColor then
-                    gcd:SetVertexColor(1, 0.91764705882353, 0, 1)
-                end
-                if gcd.texture and gcd.texture.SetVertexColor then
-                    gcd.texture:SetVertexColor(1, 0.91764705882353, 0, 1)
-                end
-            else
-                if gcd.SetAlpha then
-                    gcd:SetAlpha(0)
-                end
-                if gcd.Hide then
-                    gcd:Hide()
-                end
             end
         end
     end
