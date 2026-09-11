@@ -2978,7 +2978,7 @@ local function BuildGroup(includeChildren)
         alpha = 1,
         scale = 1,
         load = { use_petbattle = false, use_vehicleUi = false, use_never = false, class = { multi = {} }, spec = { multi = {} }, size = { multi = {} }, talent = { multi = {} } },
-        triggers = { { trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
+        triggers = { { trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
         animation = { start = { type = "none" }, main = { type = "none" }, finish = { type = "none" } },
         actions = { start = {}, init = {}, finish = {} },
         conditions = {},
@@ -3298,7 +3298,7 @@ local function ResourceFallbackGroup(parentId, includeChildren)
         alpha = 1,
         scale = 0.55,
         load = GenericLoad(),
-        triggers = { { trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
+        triggers = { { trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 },
         animation = { start = { type = "none" }, main = { type = "none" }, finish = { type = "none" } },
         actions = { start = {}, init = {}, finish = {} },
         conditions = {},
@@ -3339,7 +3339,7 @@ local function BuildResourceGroup(parentId, includeChildren)
     FinalizeResourceClone(data, RESOURCE_GROUP_ID, "raynna-rotation-resource-group", parentId)
     data.controlledChildren = children
     data.sortHybridTable = nil
-    data.triggers = { { trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 }
+    data.triggers = { { trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.25, custom = "function() return true end", names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" }, untrigger = {} }, disjunctive = "any", activeTriggerMode = -10 }
     data.load = GenericLoad()
     return data
 end
@@ -3373,7 +3373,7 @@ local function BuildResourceFillAura(parentId, index, forceChild)
     data.rotate = true
     data.triggers = {
         {
-            trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), debuffType = "HELPFUL" },
+            trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
             untrigger = {},
         },
         disjunctive = "all",
@@ -3414,7 +3414,7 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     data.yOffset = 0
     data.triggers = {
         {
-            trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), debuffType = "HELPFUL" },
+            trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
             untrigger = {},
         },
         disjunctive = "any",
@@ -3478,7 +3478,7 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
             untrigger = {},
         },
         {
-            trigger = { type = "custom", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), debuffType = "HELPFUL" },
+            trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
             untrigger = {},
         },
         disjunctive = "all",
