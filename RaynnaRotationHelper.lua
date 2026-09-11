@@ -22,14 +22,15 @@ local GROUND_AOE_COLORS = {
     GOOD = { 1, 0.88, 0.12, 1 },
     BEST = { 0.12, 0.9, 0.28, 1 },
 }
-local RESOURCE_GROUP_ID = TARGET_ID .. " - Druid Combo points"
+local OLD_RESOURCE_GROUP_ID = TARGET_ID .. " - Druid Combo points"
+local RESOURCE_GROUP_ID = TARGET_ID .. " - Resource Pips"
 local RESOURCE_IDS = {}
 local RESOURCE_OUTLINE_IDS = {}
 local RESOURCE_GCD_IDS = {}
 for i = 1, 5 do
-    RESOURCE_IDS[i] = TARGET_ID .. " - CP " .. i
-    RESOURCE_OUTLINE_IDS[i] = TARGET_ID .. " - CP" .. i .. "BlackOutline"
-    RESOURCE_GCD_IDS[i] = TARGET_ID .. " - CP" .. i .. "YellowOutline GCD"
+    RESOURCE_IDS[i] = TARGET_ID .. " - Pip " .. i
+    RESOURCE_OUTLINE_IDS[i] = TARGET_ID .. " - Pip " .. i .. " BlackOutline"
+    RESOURCE_GCD_IDS[i] = TARGET_ID .. " - Pip " .. i .. " GCD"
 end
 local CHILD_UID = "raynna-rotation-next-action"
 local ALT_CHILD_UID = "raynna-rotation-next-action-alt"
@@ -2827,9 +2828,7 @@ local function BuildGroup(includeChildren)
     if includeChildren then
         children = { CHILD_ID, ALT_CHILD_ID, DEFENSIVE_CHILD_ID, THREAT_CHILD_ID, INTERRUPT_CHILD_ID, PET_CHILD_ID, UTILITY_CHILD_ID }
         for _, quality in ipairs(GROUND_AOE_QUALITIES) do table.insert(children, GROUND_AOE_INDICATOR_IDS[quality]) end
-        if WeakAurasSaved and WeakAurasSaved.displays and WeakAurasSaved.displays["Druid Combo points"] then
-            table.insert(children, "Druid Combo points")
-        end
+        table.insert(children, RESOURCE_GROUP_ID)
     end
     return {
         id = TARGET_ID,
@@ -3283,6 +3282,16 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
     }
     return data
 end
+
+local SafeWeakAurasAdd
+local function InstallResourcePips(parentId)
+    SafeWeakAurasAdd(BuildResourceGroup(parentId, true))
+    for i = 1, #RESOURCE_IDS do
+        SafeWeakAurasAdd(BuildResourceFillAura(parentId, i, true))
+        SafeWeakAurasAdd(BuildResourceBlackOutlineAura(parentId, i, true))
+        SafeWeakAurasAdd(BuildResourceGcdAura(parentId, i, true))
+    end
+end
 local function ClearGeneratedAuraData()
     WeakAurasSaved.displays[CHILD_ID] = nil
     WeakAurasSaved.displays[ALT_CHILD_ID] = nil
@@ -3296,14 +3305,18 @@ local function ClearGeneratedAuraData()
         WeakAurasSaved.displays[RESOURCE_IDS[i]] = nil
         WeakAurasSaved.displays[RESOURCE_OUTLINE_IDS[i]] = nil
         WeakAurasSaved.displays[RESOURCE_GCD_IDS[i]] = nil
+        WeakAurasSaved.displays[TARGET_ID .. " - CP " .. i] = nil
+        WeakAurasSaved.displays[TARGET_ID .. " - CP" .. i .. "BlackOutline"] = nil
+        WeakAurasSaved.displays[TARGET_ID .. " - CP" .. i .. "YellowOutline GCD"] = nil
         WeakAurasSaved.displays[TARGET_ID .. " - Resource " .. i] = nil
         WeakAurasSaved.displays[TARGET_ID .. " - Resource Outline " .. i] = nil
     end
     WeakAurasSaved.displays[RESOURCE_GROUP_ID] = nil
+    WeakAurasSaved.displays[OLD_RESOURCE_GROUP_ID] = nil
     WeakAurasSaved.displays[TARGET_ID] = nil
 end
 
-local function SafeWeakAurasAdd(data)
+function SafeWeakAurasAdd(data)
     if not data then
         return false
     end
@@ -3480,7 +3493,7 @@ local function ShouldDisableRaynnaChild(id, data)
     if id == LEGACY_CHILD_ID or id == LEGACY_ALT_CHILD_ID then
         return true
     end
-    if id == CHILD_ID or id == ALT_CHILD_ID or id == DEFENSIVE_CHILD_ID or id == THREAT_CHILD_ID or id == INTERRUPT_CHILD_ID or id == PET_CHILD_ID or id == UTILITY_CHILD_ID or GROUND_AOE_INDICATOR_IDS.BAD == id or GROUND_AOE_INDICATOR_IDS.OK == id or GROUND_AOE_INDICATOR_IDS.GOOD == id or GROUND_AOE_INDICATOR_IDS.BEST == id or id == "Druid Combo points" or data.parent == "Druid Combo points" then
+    if id == CHILD_ID or id == ALT_CHILD_ID or id == DEFENSIVE_CHILD_ID or id == THREAT_CHILD_ID or id == INTERRUPT_CHILD_ID or id == PET_CHILD_ID or id == UTILITY_CHILD_ID or id == RESOURCE_GROUP_ID or data.parent == RESOURCE_GROUP_ID or GROUND_AOE_INDICATOR_IDS.BAD == id or GROUND_AOE_INDICATOR_IDS.OK == id or GROUND_AOE_INDICATOR_IDS.GOOD == id or GROUND_AOE_INDICATOR_IDS.BEST == id or id == "Druid Combo points" or data.parent == "Druid Combo points" then
         return false
     end
     return id == "Highlight" or data.parent == "Highlight"
@@ -3499,6 +3512,8 @@ local function PatchLegacyFeralGroup(group)
     RemoveChild(group.controlledChildren, PET_CHILD_ID)
     RemoveChild(group.controlledChildren, UTILITY_CHILD_ID)
     for _, quality in ipairs(GROUND_AOE_QUALITIES) do RemoveChild(group.controlledChildren, GROUND_AOE_INDICATOR_IDS[quality]) end
+    RemoveChild(group.controlledChildren, RESOURCE_GROUP_ID)
+    RemoveChild(group.controlledChildren, OLD_RESOURCE_GROUP_ID)
     AddExistingChild(group.controlledChildren, "Druid Combo points")
     AddExistingChild(group.controlledChildren, "Cooldowns")
     AddExistingChild(group.controlledChildren, "Highlight")
@@ -3511,6 +3526,8 @@ local function PatchLegacyFeralGroup(group)
     group.sortHybridTable[INTERRUPT_CHILD_ID] = nil
     group.sortHybridTable[PET_CHILD_ID] = nil
     group.sortHybridTable[UTILITY_CHILD_ID] = nil
+    group.sortHybridTable[RESOURCE_GROUP_ID] = nil
+    group.sortHybridTable[OLD_RESOURCE_GROUP_ID] = nil
     for _, quality in ipairs(GROUND_AOE_QUALITIES) do group.sortHybridTable[GROUND_AOE_INDICATOR_IDS[quality]] = nil end
 
     local descendants = {}
@@ -4036,7 +4053,7 @@ local function Install()
     SafeWeakAurasAdd(BuildAura(nil, 7, true))
     ClearGeneratedTextFields(UTILITY_CHILD_ID)
     for _, quality in ipairs(GROUND_AOE_QUALITIES) do SafeWeakAurasAdd(BuildGroundAoeIndicator(nil, quality)) end
-    PatchDynamicResourceGroup()
+    InstallResourcePips(nil)
 
     C_Timer.After(0.1, function()
         SafeWeakAurasAdd(BuildAura(TARGET_ID, 1))
@@ -4054,7 +4071,7 @@ local function Install()
         SafeWeakAurasAdd(BuildAura(TARGET_ID, 7))
         ClearGeneratedTextFields(UTILITY_CHILD_ID)
         for _, quality in ipairs(GROUND_AOE_QUALITIES) do SafeWeakAurasAdd(BuildGroundAoeIndicator(TARGET_ID, quality)) end
-        PatchDynamicResourceGroup()
+        InstallResourcePips(TARGET_ID)
         SafeWeakAurasAdd(BuildGroup(true))
         WeakAuras.ScanEvents("PLAYER_TARGET_CHANGED")
         print("|cff66ccff" .. ADDON_NAME .. ":|r patched group '" .. TARGET_ID .. "'.")
