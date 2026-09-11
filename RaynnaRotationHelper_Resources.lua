@@ -280,6 +280,50 @@ local function SetResourceFillHeight(region, height)
     end
 end
 
+local activeResourceGlows = {}
+
+local function EnsureResourceFallbackGlow(region)
+    if not region or not region.CreateTexture then return nil end
+    if region.RaynnaResourceGlow then
+        return region.RaynnaResourceGlow
+    end
+    local glow = region:CreateTexture(nil, "OVERLAY")
+    glow:SetTexture("Interface/Buttons/UI-ActionButton-Border")
+    glow:SetBlendMode("ADD")
+    glow:SetVertexColor(1, 0.78, 0.12, 0.95)
+    glow:SetPoint("CENTER", region, "CENTER", 0, 0)
+    glow:SetSize(42, 42)
+    glow:Hide()
+    region.RaynnaResourceGlow = glow
+    return glow
+end
+
+local function ShowResourceGlow(region)
+    if not region then return end
+    if activeResourceGlows[region] then
+        local existingGlow = EnsureResourceFallbackGlow(region)
+        if existingGlow then existingGlow:Show() end
+        return
+    end
+    activeResourceGlows[region] = true
+    if ActionButton_ShowOverlayGlow then
+        pcall(ActionButton_ShowOverlayGlow, region)
+    end
+    local glow = EnsureResourceFallbackGlow(region)
+    if glow then glow:Show() end
+end
+
+local function HideResourceGlow(region)
+    if not region then return end
+    if ActionButton_HideOverlayGlow then
+        pcall(ActionButton_HideOverlayGlow, region)
+    end
+    if region.RaynnaResourceGlow then
+        region.RaynnaResourceGlow:Hide()
+    end
+    activeResourceGlows[region] = nil
+end
+
 function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
     local count, maxCount, resource, _, remaining = 0, 0, nil, nil, nil
     if _G.RaynnaRotationHelperGetResourceInfo then
@@ -324,8 +368,10 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
         if border then
             if maxCount > 0 and count >= maxCount and i <= maxCount then
                 SetTextureColor(border, { 1, 0.82, 0.18, 0.95 })
+                ShowResourceGlow(border)
             else
                 SetTextureColor(border, borderColor)
+                HideResourceGlow(border)
             end
         end
     end
