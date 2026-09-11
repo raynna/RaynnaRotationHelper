@@ -939,18 +939,16 @@ local function BuildContext()
         return best > 0 and best or nil
     end
     function ctx.arcaneCharges()
+        local buffCharges = ctx.arcaneChargeBuffStacks()
         local powerType = SPELL_POWER_ARCANE_CHARGES or (Enum and Enum.PowerType and Enum.PowerType.ArcaneCharges) or 16
-        local powerMax = UnitPowerMax and UnitPowerMax("player", powerType) or 0
-        if UnitPower and powerMax and powerMax > 0 then
-            return UnitPower("player", powerType) or 0
-        end
-        return ctx.arcaneChargeBuffStacks()
+        local powerCharges = UnitPower and UnitPower("player", powerType) or 0
+        return math.max(buffCharges or 0, powerCharges or 0)
     end
 
     function ctx.arcaneChargesMax()
         local powerType = SPELL_POWER_ARCANE_CHARGES or (Enum and Enum.PowerType and Enum.PowerType.ArcaneCharges) or 16
         local powerMax = UnitPowerMax and UnitPowerMax("player", powerType) or 0
-        return powerMax and powerMax > 0 and powerMax or 4
+        return math.max(powerMax or 0, 4)
     end
 
     ctx.focusType = Enum and Enum.PowerType and Enum.PowerType.Focus or 2
@@ -3369,7 +3367,7 @@ local function BuildResourceFillAura(parentId, index, forceChild)
     }
     local resource = select(3, ComputeResourceInfo())
     FinalizeResourceClone(data, id, "raynna-rotation-cp-fill-" .. index, parentId)
-    data.color = ResourceColor(resource)
+    data.color = { 0.94509803921569, 0.019607843137255, 0, 1 }
     data.conditions = {}
     data.animation = RaynnaRotationHelperResourceFadeAnimation("custom")
     data.rotate = true
@@ -3410,10 +3408,10 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     data.conditions = {}
     data.animation = RaynnaRotationHelperResourceFadeAnimation("none")
     data.rotate = true
-    data.anchorFrameType = "SCREEN"
-    data.anchorFrameFrame = nil
-    data.xOffset = ResourceXOffset(index)
-    data.yOffset = -165
+    data.anchorFrameType = "SELECTFRAME"
+    data.anchorFrameFrame = "WeakAuras:" .. RESOURCE_IDS[index]
+    data.xOffset = 0
+    data.yOffset = 0
     data.triggers = {
         {
             trigger = { type = "custom", event = "Health", unit = "player", custom_type = "status", check = "update", onUpdateThrottle = 0.1, custom = RESOURCE_SLOT_TRIGGER_TEMPLATE:gsub("%%%%INDEX%%%%", tostring(index)), names = {}, spellIds = {}, subeventPrefix = "SPELL", subeventSuffix = "_CAST_START", debuffType = "HELPFUL" },
@@ -4132,33 +4130,26 @@ local function WeakAuraRegion(id)
     return _G["WeakAuras:" .. id]
 end
 
-local function UpdateResourcePipVisuals()
-    local count, _, resource, _, remaining = ComputeResourceInfo()
-    count = math.max(0, math.min(tonumber(count) or 0, #RESOURCE_IDS))
-    local fillColor = ResourceColor(resource)
-    local pulse = 1
-    if resource == "ARCANE_CHARGES" and remaining and remaining ~= math.huge and remaining <= 4 and count > 0 then
-        pulse = 0.55 + 0.45 * math.abs(math.sin(GetTime() * 4))
-    end
-
+local function SetResourceFillAlpha(alpha)
     for i = 1, #RESOURCE_IDS do
-        local fill = WeakAuraRegion(RESOURCE_IDS[i])
-        if fill then
-            if fill.SetAlpha then
-                fill:SetAlpha(i <= count and pulse or 1)
-            end
-            if fill.SetColor then
-                fill:SetColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
-            end
-            if fill.SetVertexColor then
-                fill:SetVertexColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
-            end
-            if fill.texture and fill.texture.SetVertexColor then
-                fill.texture:SetVertexColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
-            end
-            if fill.icon and fill.icon.SetVertexColor then
-                fill.icon:SetVertexColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
-            end
+        local region = WeakAuraRegion(RESOURCE_IDS[i])
+        if region and region.SetAlpha then
+            region:SetAlpha(alpha)
+        end
+    end
+end
+
+local function UpdateResourcePulse()
+    local count, _, resource, _, remaining = ComputeResourceInfo()
+    if resource ~= "ARCANE_CHARGES" or not remaining or remaining == math.huge or remaining > 4 or (count or 0) <= 0 then
+        SetResourceFillAlpha(1)
+        return
+    end
+    local pulse = 0.55 + 0.45 * math.abs(math.sin(GetTime() * 4))
+    for i = 1, #RESOURCE_IDS do
+        local region = WeakAuraRegion(RESOURCE_IDS[i])
+        if region and region.SetAlpha then
+            region:SetAlpha(i <= count and pulse or 1)
         end
     end
 end
@@ -4171,7 +4162,7 @@ glowFrame:SetScript("OnUpdate", function(self, elapsed)
     self.elapsed = 0
     UpdateActionBarGlow()
     UpdateHealFrameGlow()
-    UpdateResourcePipVisuals()
+    UpdateResourcePulse()
 end)
 
 local function Install()
@@ -4410,7 +4401,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     if event == "COMBAT_LOG_EVENT_UNFILTERED" then
         TrackCombatLogHostileAttacker(...)
         UpdateActionBarGlow()
-        UpdateResourcePipVisuals()
+        UpdateResourcePulse()
         if WeakAuras and WeakAuras.ScanEvents then
             WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
         end
@@ -4444,7 +4435,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end
     UpdateActionBarGlow()
     UpdateHealFrameGlow()
-    UpdateResourcePipVisuals()
+    UpdateResourcePulse()
     if WeakAuras and WeakAuras.ScanEvents then
         WeakAuras.ScanEvents("RAYNNA_ROTATION_UPDATE")
     end
