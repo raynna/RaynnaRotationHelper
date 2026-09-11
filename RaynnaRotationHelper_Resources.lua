@@ -258,11 +258,8 @@ end
 
 local RESOURCE_FILL_FULL_HEIGHT = 28
 local RESOURCE_FILL_EMPTY_HEIGHT = 0.5
-local RESOURCE_FILL_SPEED = 70
-local RESOURCE_MAX_FLASH_SECONDS = 0.55
+local RESOURCE_FILL_SPEED = 25
 local resourceFillHeights = {}
-local lastResourceCount = 0
-local resourceMaxFlashUntil = 0
 
 local function SetTextureColor(region, color)
     if region and color then
@@ -291,19 +288,11 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
     count = count or 0
     maxCount = maxCount or 0
     elapsed = elapsed or 0.05
-
     local now = GetTime and GetTime() or 0
-    if maxCount > 0 and count >= maxCount and (lastResourceCount or 0) < maxCount then
-        resourceMaxFlashUntil = now + RESOURCE_MAX_FLASH_SECONDS
-    end
-    lastResourceCount = count
 
     local baseColor = ResourceColor(resource)
     local borderColor = ResourceColor(resource)
     borderColor[4] = 0.32
-    local flashRemaining = resourceMaxFlashUntil - now
-    local flashActive = flashRemaining > 0
-    local flashAlpha = flashActive and math.max(0.18, math.min(1, flashRemaining / RESOURCE_MAX_FLASH_SECONDS)) or 0
 
     for i = 1, #RESOURCE_IDS do
         local fill = WeakAuraRegion(RESOURCE_IDS[i])
@@ -333,8 +322,8 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
 
         local border = WeakAuraRegion(RESOURCE_GCD_IDS[i])
         if border then
-            if flashActive and i <= maxCount then
-                SetTextureColor(border, { 1, 0.82, 0.18, 0.38 + 0.62 * flashAlpha })
+            if maxCount > 0 and count >= maxCount and i <= maxCount then
+                SetTextureColor(border, { 1, 0.82, 0.18, 0.95 })
             else
                 SetTextureColor(border, borderColor)
             end
