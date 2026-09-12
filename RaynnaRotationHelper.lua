@@ -564,6 +564,9 @@ local function TrackCombatLogHostileAttacker(...)
         end
         return
     end
+    if subevent == "SPELL_CAST_SUCCESS" then
+        RaynnaRotationHelperRememberPaladinSealSpell(spellID, nil, sourceGUID)
+    end
     if subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" then
         TrackGroundTargetSpellHit(sourceGUID, destGUID, spellID)
     end
@@ -1547,7 +1550,41 @@ local function CurrentPaladinSealAction(slot)
     return nil
 end
 
+function RaynnaRotationHelperRememberPaladinSealSpell(spellID, spellName, sourceGUID)
+    if sourceGUID and UnitGUID and sourceGUID ~= UnitGUID("player") then
+        return nil
+    end
+    local matched = MatchPaladinSeal(spellID, spellName or (spellID and GetSpellInfo(spellID)))
+    if matched then
+        _G.RaynnaRotationHelperLastPaladinSealID = matched
+        GetDB().paladinSealSpellID = matched
+        return matched
+    end
+    return nil
+end
+
+function RaynnaRotationHelperTrackPaladinSealCast(unit, ...)
+    if unit ~= "player" then
+        return nil
+    end
+    for i = 1, select("#", ...) do
+        local value = select(i, ...)
+        if type(value) == "number" then
+            local matched = RaynnaRotationHelperRememberPaladinSealSpell(value, nil, nil)
+            if matched then return matched end
+        elseif type(value) == "string" then
+            local matched = RaynnaRotationHelperRememberPaladinSealSpell(nil, value, nil)
+            if matched then return matched end
+        end
+    end
+    return nil
+end
+
 local function ActivePaladinSealSpellID()
+    local rememberedSeal = _G.RaynnaRotationHelperLastPaladinSealID or GetDB().paladinSealSpellID
+    if rememberedSeal and PALADIN_SEAL_IDS[rememberedSeal] then
+        return rememberedSeal
+    end
     if IsCurrentSpell then
         for _, sealID in ipairs(PALADIN_SEALS) do
             if IsCurrentSpell(sealID) then
@@ -4336,6 +4373,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     end
     if event == "UNIT_SPELLCAST_SUCCEEDED" then
         TrackGroundTargetSpellCast(...)
+        RaynnaRotationHelperTrackPaladinSealCast(...)
     end
     if event == "PLAYER_REGEN_ENABLED" then
         if wipe then
