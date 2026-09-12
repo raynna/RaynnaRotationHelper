@@ -3925,6 +3925,13 @@ local function PrintActionBarDebug()
     PrintButtonMatches("interrupt", interruptSpellID)
     PrintButtonMatches("pet", petSpellID)
     PrintButtonMatches("utility", utilitySpellID)
+    if _G.RaynnaRotationHelperGetClickDebug then
+        local labels = { "primary", "alternate", "defensive", "threat", "interrupt", "pet", "utility" }
+        for i, label in ipairs(labels) do
+            local clickName, clickMacro, clickShown = _G.RaynnaRotationHelperGetClickDebug(i)
+            print("|cff66ccff" .. ADDON_NAME .. ":|r click " .. label .. " shown=" .. tostring(clickShown) .. " spell=" .. tostring(clickName) .. " macro=" .. tostring(clickMacro))
+        end
+    end
 end
 
 local glowFrame = CreateFrame("Frame")

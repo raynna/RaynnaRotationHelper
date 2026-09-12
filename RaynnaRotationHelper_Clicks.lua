@@ -11,6 +11,21 @@ local RECOMMENDATION_IDS = {
 
 local buttons = {}
 
+local PET_CAST_MACROS = {
+    [136] = "/cast Mend Pet",
+    [883] = "/cast Call Pet 1",
+    [982] = "/cast Revive Pet",
+    [688] = "/cast Summon Imp",
+    [691] = "/cast Summon Felhunter",
+    [697] = "/cast Summon Voidwalker",
+    [712] = "/cast Summon Succubus",
+    [30146] = "/cast Summon Felguard",
+    [31687] = "/cast Summon Water Elemental",
+}
+
+local function MacroTextForSpell(spellID, spellName)
+    return PET_CAST_MACROS[spellID] or (spellName and ("/cast " .. spellName)) or nil
+end
 local function WeakAuraRegion(id)
     if WeakAuras and WeakAuras.GetRegion then
         local region = WeakAuras.GetRegion(id)
@@ -27,6 +42,7 @@ local function EnsureButton(slot)
     button:SetFrameLevel(10000)
     if button.SetToplevel then button:SetToplevel(true) end
     button:SetAttribute("type", "macro")
+    button:SetAttribute("type1", "macro")
     button:EnableMouse(true)
     button:SetScript("OnEnter", function(self)
         if GameTooltip and self.spellName then
@@ -74,12 +90,21 @@ local function UpdateClickButtons()
         local spellName = spellID and GetSpellInfo and GetSpellInfo(spellID) or nil
         local regionShown = region and (not region.IsShown or region:IsShown())
         if regionShown and spellName and PositionButton(button, region) then
-            button:SetAttribute("macrotext", "/cast " .. spellName)
+            local macroText = MacroTextForSpell(spellID, spellName)
+            button:SetAttribute("type", "macro")
+            button:SetAttribute("type1", "macro")
+            button:SetAttribute("macrotext", macroText)
+            button:SetAttribute("macrotext1", macroText)
+            button.spellID = spellID
             button.spellName = spellName
+            button.macroText = macroText
             button:Show()
         else
             button:SetAttribute("macrotext", nil)
+            button:SetAttribute("macrotext1", nil)
+            button.spellID = nil
             button.spellName = nil
+            button.macroText = nil
             button:Hide()
         end
     end
@@ -100,3 +125,11 @@ frame:SetScript("OnUpdate", function(self, elapsed)
     self.elapsed = 0
     UpdateClickButtons()
 end)
+function _G.RaynnaRotationHelperGetClickDebug(slot)
+    local button = buttons and buttons[slot]
+    if not button then
+        return "missing", "", "false"
+    end
+    local shown = button.IsShown and button:IsShown() or false
+    return tostring(button.spellName or "none"), tostring(button.macroText or "none"), tostring(shown)
+end
