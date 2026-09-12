@@ -1351,11 +1351,11 @@ RegisterRotation("DRUID:2", {
         if cp >= 5 and srRem > 6 and ripRem > 8 and rakeRem > 3 and ctx.ready(22568, 25) then return 22568 end
         if bossTarget and inCombat and srRem > 6 and ripRem > 6 and ctx.ready(108288) then return 108288 end
         if bossTarget and inCombat and srRem > 6 and ripRem > 6 and ctx.ready(106951) then return 106951 end
-        if rakeRem <= 3 and ctx.ready(1822, 35) then return 1822 end
-        if thrashRem <= 3 and ctx.ready(106830, 50) then return 106830 end
+        if rakeRem <= 2 and energy >= 35 and ctx.ready(1822, 35) and ctx.inRange(1822) then return 1822 end
+        if thrashRem <= 2 and energy >= 50 and ctx.ready(106830, 50) and ctx.inRange(106830) then return 106830 end
         local behind = ctx.behindTarget()
-        local shredReady = ctx.ready(5221, 40) and ctx.inRange(5221)
-        local mangleReady = ctx.ready(33876, 35) and ctx.inRange(33876)
+        local shredReady = energy >= 40 and ctx.ready(5221, 40) and ctx.inRange(5221)
+        local mangleReady = energy >= 35 and ctx.ready(33876, 35) and ctx.inRange(33876)
         if behind == nil and shredReady and mangleReady then return 33876, 5221 end
         if behind ~= false and shredReady then return 5221 end
         if mangleReady then return 33876 end
@@ -2385,6 +2385,23 @@ local function PlayerBusyCasting()
 end
 
 local function ActiveRotation(ctx)
+    if ctx.class == "DRUID" then
+        if ctx.hasBuff and ctx.hasBuff(768) and rotationModules["DRUID:2"] then
+            lastActiveModuleKey = "DRUID:2"
+            lastActiveModuleReason = "cat form override"
+            return rotationModules["DRUID:2"]
+        end
+        if ctx.hasBuff and ctx.hasBuff(5487) and rotationModules["DRUID:3"] then
+            lastActiveModuleKey = "DRUID:3"
+            lastActiveModuleReason = "bear form override"
+            return rotationModules["DRUID:3"]
+        end
+        if ctx.hasBuff and ctx.hasBuff(24858) and rotationModules["DRUID:1"] then
+            lastActiveModuleKey = "DRUID:1"
+            lastActiveModuleReason = "moonkin form override"
+            return rotationModules["DRUID:1"]
+        end
+    end
     local key = (ctx.class or "") .. ":" .. tostring(ctx.spec or 0)
     local module = rotationModules[key]
     if module and module.enabled and module.enabled(ctx) then
@@ -2995,7 +3012,14 @@ local function GenericFallbackRecommendation(ctx, module)
         local spell = ctx.readyAnyInRange(20271, 35395, 879)
         if spell then return spell, "melee/ranged fallback" end
     elseif class == "DRUID" then
-        local spell = ctx.readyAnyInRange(5176, 33876, 5221, 33917, 8921)
+        local spell
+        if ctx.hasBuff and ctx.hasBuff(768) then
+            spell = ctx.readyAnyInRange(33876, 5221, 1822)
+        elseif ctx.hasBuff and ctx.hasBuff(5487) then
+            spell = ctx.readyAnyInRange(33917, 6807, 779)
+        else
+            spell = ctx.readyAnyInRange(5176, 33876, 5221, 33917, 8921)
+        end
         if spell then return spell, "form fallback" end
     elseif class == "PRIEST" then
         local spell = ctx.readyAnyInRange(589, 8092, 585)
