@@ -37,12 +37,17 @@ end
 local function EnsureButton(slot)
     if buttons[slot] then return buttons[slot] end
     local button = CreateFrame("Button", "RaynnaRotationHelperClick" .. slot, UIParent, "SecureActionButtonTemplate")
-    button:RegisterForClicks("AnyUp")
+    button:RegisterForClicks("AnyUp", "AnyDown")
     button:SetFrameStrata("TOOLTIP")
     button:SetFrameLevel(10000)
     if button.SetToplevel then button:SetToplevel(true) end
     button:SetAttribute("type", "macro")
     button:SetAttribute("type1", "macro")
+    button:SetAttribute("*type1", "macro")
+    local tex = button:CreateTexture(nil, "BACKGROUND")
+    tex:SetAllPoints(button)
+    tex:SetColorTexture(1, 1, 1, 0.001)
+    button.RaynnaClickTexture = tex
     button:EnableMouse(true)
     button:SetScript("OnEnter", function(self)
         if GameTooltip and self.spellName then
@@ -54,6 +59,10 @@ local function EnsureButton(slot)
     end)
     button:SetScript("OnLeave", function()
         if GameTooltip then GameTooltip:Hide() end
+    end)
+    button:SetScript("PostClick", function(self, mouseButton)
+        self.RaynnaLastClickAt = GetTime and GetTime() or 0
+        self.RaynnaLastClickButton = mouseButton or "unknown"
     end)
     button:Hide()
     buttons[slot] = button
@@ -93,8 +102,10 @@ local function UpdateClickButtons()
             local macroText = MacroTextForSpell(spellID, spellName)
             button:SetAttribute("type", "macro")
             button:SetAttribute("type1", "macro")
+            button:SetAttribute("*type1", "macro")
             button:SetAttribute("macrotext", macroText)
             button:SetAttribute("macrotext1", macroText)
+            button:SetAttribute("*macrotext1", macroText)
             button.spellID = spellID
             button.spellName = spellName
             button.macroText = macroText
@@ -102,6 +113,7 @@ local function UpdateClickButtons()
         else
             button:SetAttribute("macrotext", nil)
             button:SetAttribute("macrotext1", nil)
+            button:SetAttribute("*macrotext1", nil)
             button.spellID = nil
             button.spellName = nil
             button.macroText = nil
@@ -131,5 +143,7 @@ function _G.RaynnaRotationHelperGetClickDebug(slot)
         return "missing", "", "false"
     end
     local shown = button.IsShown and button:IsShown() or false
-    return tostring(button.spellName or "none"), tostring(button.macroText or "none"), tostring(shown)
+    local lastClick = button.RaynnaLastClickAt and string.format("%.1f", button.RaynnaLastClickAt) or "never"
+    local clickButton = button.RaynnaLastClickButton or "none"
+    return tostring(button.spellName or "none"), tostring(button.macroText or "none"), tostring(shown) .. " lastClick=" .. lastClick .. " button=" .. tostring(clickButton)
 end
