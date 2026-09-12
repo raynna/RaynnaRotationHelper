@@ -1634,25 +1634,6 @@ local function ActivePaladinSealSpellID()
     return nil
 end
 
-local function PaladinHasSeal(ctx)
-    if ActivePaladinSealSpellID() then
-        return true
-    end
-    return ctx.buffRem("player", 31801, 20165, 20154, 20164, 20166) > 0
-end
-
-local function PaladinSealRecommendation(ctx)
-    if ctx.class ~= "PALADIN" or PaladinHasSeal(ctx) then
-        return nil
-    end
-    if ctx.spec == 1 then
-        return ctx.readyAny(nil, nil, 20165, 31801, 20154, 20164, 20166)
-    end
-    if ctx.spec == 2 then
-        return ctx.readyAny(nil, nil, 20165, 31801, 20154, 20164, 20166)
-    end
-    return ctx.readyAny(nil, nil, 31801, 20154, 20165, 20164, 20166)
-end
 RegisterRotation("PALADIN:1", {
     name = "Holy Paladin",
     resource = "HOLY_POWER",
@@ -2983,10 +2964,6 @@ end
 
 
 local function GenericUtilityRecommendation(ctx)
-    if ctx.class == "PALADIN" then
-        local seal = PaladinSealRecommendation(ctx)
-        if seal then return seal, "seal missing" end
-    end
     if not ctx.hasAttackTarget() then
         return nil, "no hostile target"
     end
