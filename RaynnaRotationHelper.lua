@@ -1461,6 +1461,24 @@ RegisterRotation("MAGE:3", {
     end,
 })
 
+local PALADIN_SEALS = { 31801, 20165, 20154, 20164, 20166 }
+
+local function PaladinHasSeal(ctx)
+    return ctx.buffRem("player", 31801, 20165, 20154, 20164, 20166) > 0
+end
+
+local function PaladinSealRecommendation(ctx)
+    if ctx.class ~= "PALADIN" or PaladinHasSeal(ctx) then
+        return nil
+    end
+    if ctx.spec == 1 then
+        return ctx.readyAny(nil, nil, 20165, 31801, 20154, 20164, 20166)
+    end
+    if ctx.spec == 2 then
+        return ctx.readyAny(nil, nil, 20165, 31801, 20154, 20164, 20166)
+    end
+    return ctx.readyAny(nil, nil, 31801, 20154, 20165, 20164, 20166)
+end
 RegisterRotation("PALADIN:1", {
     name = "Holy Paladin",
     resource = "HOLY_POWER",
@@ -1468,7 +1486,7 @@ RegisterRotation("PALADIN:1", {
         return ctx.class == "PALADIN" and ctx.spec == 1
     end,
     recommend = function(ctx)
-        if ctx.buffRem("player", 20165, 20154) <= 0 then local seal = ctx.readyAny(nil, nil, 20165, 20154) if seal then return seal end end
+        local seal = PaladinSealRecommendation(ctx); if seal then return seal end
         local unit = ctx.healUnit()
         local hp = ctx.unitHpPct(unit)
         local holyPower = ctx.holyPower()
@@ -1491,7 +1509,7 @@ RegisterRotation("PALADIN:2", {
     end,
     recommend = function(ctx)
         if ctx.known(25780) and ctx.buffRem("player", 25780) <= 0 and ctx.ready(25780) then return 25780 end
-        if ctx.buffRem("player", 20165, 20154) <= 0 then local seal = ctx.readyAny(nil, nil, 20165, 20154) if seal then return seal end end
+        local seal = PaladinSealRecommendation(ctx); if seal then return seal end
         if not ctx.hasAttackTarget() then return nil end
 
         local enemies = ctx.enemyCount()
@@ -1499,7 +1517,7 @@ RegisterRotation("PALADIN:2", {
         local bossTarget = ctx.targetIsBoss()
         local holyPower = ctx.holyPower()
         if bossTarget and ctx.ready(31935) then return 31935 end
-        if holyPower >= 5 and ctx.ready(53600) then return 53600 end
+        if holyPower >= ctx.holyPowerMax() and ctx.ready(53600) then return 53600 end
         if avengerTargets >= 2 and ctx.ready(31935) and ctx.inRange(31935) then return 31935 end
         if ctx.targetHpPct() <= 20 and ctx.ready(24275) and ctx.inRange(24275) then return 24275 end
         if enemies >= 2 and ctx.ready(53595) and ctx.inRange(53595) then return 53595 end
@@ -1522,7 +1540,7 @@ RegisterRotation("PALADIN:3", {
         return ctx.class == "PALADIN" and (ctx.spec == 3 or ctx.spec == nil)
     end,
     recommend = function(ctx)
-        if ctx.buffRem("player", 31801, 20154) <= 0 then local seal = ctx.readyAny(nil, nil, 31801, 20154) if seal then return seal end end
+        local seal = PaladinSealRecommendation(ctx); if seal then return seal end
         if ctx.known(20217) and ctx.buffRem("player", 20217, 19740) <= 0 and ctx.ready(20217) then return 20217 end
         if ctx.known(19740) and ctx.buffRem("player", 20217, 19740) <= 0 and ctx.ready(19740) then return 19740 end
         if not ctx.hasAttackTarget() then return nil end
@@ -1533,8 +1551,8 @@ RegisterRotation("PALADIN:3", {
         local bossTarget = ctx.targetIsBoss()
         local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
         if holyPower >= 3 and ctx.buffRem("player", 84963) <= 4 and ctx.ready(84963) then return 84963 end
-        if enemies >= 2 and holyPower >= 5 and ctx.ready(53385) then return 53385 end
-        if holyPower >= 5 and ctx.ready(85256) then return 85256 end
+        if enemies >= 2 and holyPower >= ctx.holyPowerMax() and ctx.ready(53385) then return 53385 end
+        if holyPower >= ctx.holyPowerMax() and ctx.ready(85256) then return 85256 end
         if bossTarget and inCombat and ctx.ready(86698) then return 86698 end
         if bossTarget and inCombat and ctx.ready(31884) then return 31884 end
         if (ctx.targetHpPct() <= 20 or wings) and ctx.ready(24275) and ctx.inRange(24275) then return 24275 end
@@ -2943,7 +2961,7 @@ local function ComputeResourceInfo()
         if rawMax <= 0 and charges <= 0 and not ctx.known(30451) then
             return 0, 0, nil, nil
         end
-        return charges, math.max(rawMax or 0, 4), module.resource, 135734, ctx.arcaneChargeRemaining()
+        return charges, (rawMax > 0 and rawMax or 4), module.resource, 135734, ctx.arcaneChargeRemaining()
     end
 
     if module.resource == "HOLY_POWER" then
@@ -2952,7 +2970,7 @@ local function ComputeResourceInfo()
         if rawMax <= 0 and count <= 0 then
             return 0, 0, nil, nil
         end
-        return count, math.max(rawMax or 0, 5), module.resource, 135920
+        return count, (rawMax > 0 and rawMax or 3), module.resource, 135920
     end
 
     if module.resource == "CHI" then
@@ -2961,7 +2979,7 @@ local function ComputeResourceInfo()
         if rawMax <= 0 and count <= 0 then
             return 0, 0, nil, nil
         end
-        return count, math.max(rawMax or 0, 4), module.resource, 606552
+        return count, (rawMax > 0 and rawMax or 4), module.resource, 606552
     end
 
     if module.resource == "SHADOW_ORBS" then
@@ -2970,7 +2988,7 @@ local function ComputeResourceInfo()
         if rawMax <= 0 and count <= 0 then
             return 0, 0, nil, nil
         end
-        return count, math.max(rawMax or 0, 3), module.resource, 136224
+        return count, (rawMax > 0 and rawMax or 3), module.resource, 136224
     end
 
     if module.resource == "SOUL_SHARDS" then
@@ -2979,7 +2997,7 @@ local function ComputeResourceInfo()
         if rawMax <= 0 and count <= 0 then
             return 0, 0, nil, nil
         end
-        return count, math.max(rawMax or 0, 4), module.resource, 538443
+        return count, (rawMax > 0 and rawMax or 4), module.resource, 538443
     end
 
     if module.resource == "BURNING_EMBERS" then

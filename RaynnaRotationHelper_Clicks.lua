@@ -23,10 +23,22 @@ local function EnsureButton(slot)
     if buttons[slot] then return buttons[slot] end
     local button = CreateFrame("Button", "RaynnaRotationHelperClick" .. slot, UIParent, "SecureActionButtonTemplate")
     button:RegisterForClicks("AnyUp")
-    button:SetFrameStrata("DIALOG")
-    button:SetFrameLevel(100)
-    button:SetAttribute("type", "spell")
+    button:SetFrameStrata("TOOLTIP")
+    button:SetFrameLevel(10000)
+    if button.SetToplevel then button:SetToplevel(true) end
+    button:SetAttribute("type", "macro")
     button:EnableMouse(true)
+    button:SetScript("OnEnter", function(self)
+        if GameTooltip and self.spellName then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(self.spellName)
+            GameTooltip:AddLine("Click to cast", 0.7, 0.9, 1)
+            GameTooltip:Show()
+        end
+    end)
+    button:SetScript("OnLeave", function()
+        if GameTooltip then GameTooltip:Hide() end
+    end)
     button:Hide()
     buttons[slot] = button
     return button
@@ -57,10 +69,12 @@ local function UpdateClickButtons()
         local spellName = spellID and GetSpellInfo and GetSpellInfo(spellID) or nil
         local regionShown = region and (not region.IsShown or region:IsShown())
         if regionShown and spellName and PositionButton(button, region) then
-            button:SetAttribute("spell", spellName)
+            button:SetAttribute("macrotext", "/cast " .. spellName)
+            button.spellName = spellName
             button:Show()
         else
-            button:SetAttribute("spell", nil)
+            button:SetAttribute("macrotext", nil)
+            button.spellName = nil
             button:Hide()
         end
     end
