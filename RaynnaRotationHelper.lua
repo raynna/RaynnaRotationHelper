@@ -564,9 +564,6 @@ local function TrackCombatLogHostileAttacker(...)
         end
         return
     end
-    if subevent == "SPELL_CAST_SUCCESS" then
-        RaynnaRotationHelperRememberPaladinSealSpell(spellID, nil, sourceGUID)
-    end
     if subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" then
         TrackGroundTargetSpellHit(sourceGUID, destGUID, spellID)
     end
@@ -1560,7 +1557,7 @@ function RaynnaRotationHelperRememberPaladinSealSpell(spellID, spellName, source
     end
 
     local now = GetTime and GetTime() or 0
-    if _G.RaynnaRotationHelperLastSealCastID == matched and now - (_G.RaynnaRotationHelperLastSealCastAt or 0) < 0.45 then
+    if _G.RaynnaRotationHelperLastSealCastID == matched and now - (_G.RaynnaRotationHelperLastSealCastAt or 0) < 0.25 then
         return matched
     end
     _G.RaynnaRotationHelperLastSealCastID = matched
