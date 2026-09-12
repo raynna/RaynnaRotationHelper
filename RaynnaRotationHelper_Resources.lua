@@ -278,8 +278,10 @@ local function WeakAuraRegion(id)
     return _G["WeakAuras:" .. id]
 end
 
-local RESOURCE_FILL_ALPHA_SPEED = 5.5
-local resourceFillAlphas = {}
+local RESOURCE_FILL_FULL_HEIGHT = 22
+local RESOURCE_FILL_EMPTY_HEIGHT = 0.5
+local RESOURCE_FILL_SPEED = 4.2
+local resourceFillHeights = {}
 
 local function SetTextureColor(region, color)
     if region and color then
@@ -307,6 +309,28 @@ local function SetResourceFillHeight(region, height)
         region:SetRegionHeight(height)
     elseif region.SetHeight then
         region:SetHeight(height)
+    end
+end
+
+local function SetResourceFillCrop(region, height)
+    if not region then return end
+    local fraction = math.max(0.001, math.min(1, height / RESOURCE_FILL_FULL_HEIGHT))
+    local top = 1 - fraction
+    if region.texture and region.texture.SetTexCoord then
+        region.texture:SetTexCoord(0, 1, top, 1)
+    elseif region.SetTexCoord then
+        region:SetTexCoord(0, 1, top, 1)
+    end
+end
+
+local function SetResourceFillYOffset(region, height)
+    if not region then return end
+    local y = -11 + (height / 2)
+    if region.SetYOffset then
+        region:SetYOffset(y)
+    elseif region.SetPoint and region.ClearAllPoints then
+        region:ClearAllPoints()
+        region:SetPoint("CENTER", UIParent, "CENTER", ResourceXOffset(region.RaynnaResourceIndex or 1), y)
     end
 end
 
@@ -373,23 +397,27 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
         local border = WeakAuraRegion(RESOURCE_GCD_IDS[i])
         local slotActive = maxCount > 0 and i <= maxCount
         local filled = slotActive and i <= count
-        local targetAlpha = filled and 1 or 0
-        local current = resourceFillAlphas[i]
-        if current == nil then current = targetAlpha end
-        local step = RESOURCE_FILL_ALPHA_SPEED * elapsed
-        if current < targetAlpha then
-            current = math.min(targetAlpha, current + step)
-        elseif current > targetAlpha then
-            current = math.max(targetAlpha, current - step)
+        local targetHeight = filled and RESOURCE_FILL_FULL_HEIGHT or RESOURCE_FILL_EMPTY_HEIGHT
+        local current = resourceFillHeights[i]
+        if current == nil then current = targetHeight end
+        local step = RESOURCE_FILL_SPEED * elapsed
+        if current < targetHeight then
+            current = math.min(targetHeight, current + step)
+        elseif current > targetHeight then
+            current = math.max(targetHeight, current - step)
         end
-        resourceFillAlphas[i] = current
+        resourceFillHeights[i] = current
 
         if fill then
             SetRegionTexture(fill, ResourceSprite(resource, true))
+            fill.RaynnaResourceIndex = i
+            SetResourceFillHeight(fill, current)
+            SetResourceFillCrop(fill, current)
+            SetResourceFillYOffset(fill, current)
             if fill.SetAlpha then
-                local alpha = slotActive and current or 0
-                if resource == "ARCANE_CHARGES" and remaining and remaining ~= math.huge and remaining <= 4 and filled then
-                    alpha = math.max(0.5, alpha * (0.65 + 0.35 * math.abs(math.sin(now * 4))))
+                local alpha = (slotActive and current > RESOURCE_FILL_EMPTY_HEIGHT + 0.05) and 1 or 0
+                if remaining and remaining ~= math.huge and remaining <= 4 and filled then
+                    alpha = math.max(0.45, alpha * (0.5 + 0.5 * math.abs(math.sin(now * 0.9))))
                 end
                 fill:SetAlpha(alpha)
             end
@@ -403,14 +431,9 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
         end
 
         if border then
-            if slotActive and count >= maxCount then
-                SetTextureColor(border, { 1, 0.82, 0.18, 0.95 })
-                ShowResourceGlow(border)
-            else
-                borderColor[4] = slotActive and 0.32 or 0
-                SetTextureColor(border, borderColor)
-                HideResourceGlow(border)
-            end
+            borderColor[4] = slotActive and 0.28 or 0
+            SetTextureColor(border, borderColor)
+            HideResourceGlow(border)
         end
     end
 end

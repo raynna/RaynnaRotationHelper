@@ -333,6 +333,7 @@ local GROUND_TARGET_DURATIONS = {
 }
 
 local groundTargetEffectUntil = {}
+local groundTargetEffectHits = {}
 
 local function IsGroundTargetSpell(spellID)
     return spellID and GROUND_TARGET_SPELLS[spellID] or false
@@ -385,10 +386,26 @@ local function GroundTargetEffectRemaining(spellID)
     return math.max(0, expires - GetTime())
 end
 
+local function ActiveGroundTargetEffectSpellID()
+    local now = GetTime()
+    local activeSpellID, activeRemaining = nil, 0
+    for spellID, expires in pairs(groundTargetEffectUntil) do
+        if type(spellID) == "number" and type(expires) == "number" then
+            local remaining = expires - now
+            if remaining > activeRemaining then
+                activeSpellID = spellID
+                activeRemaining = remaining
+            end
+        end
+    end
+    return activeSpellID, activeRemaining
+end
+
 local function MarkGroundTargetSpellCast(spellID)
     if IsGroundTargetSpell(spellID) then
         RaynnaRotationHelperRememberGroundTargetSpell(spellID)
         groundTargetEffectUntil[spellID] = GetTime() + (GROUND_TARGET_DURATIONS[spellID] or 8)
+        groundTargetEffectHits[spellID] = {}
     end
 end
 
@@ -421,6 +438,25 @@ local function TrackGroundTargetSpellCast(unit, ...)
     if spellID then
         MarkGroundTargetSpellCast(spellID)
     end
+end
+
+local function TrackGroundTargetSpellHit(sourceGUID, destGUID, spellID)
+    if not sourceGUID or sourceGUID ~= UnitGUID("player") or not destGUID or not IsGroundTargetSpell(spellID) then
+        return
+    end
+    if GroundTargetEffectRemaining(spellID) <= 0 then
+        return
+    end
+    groundTargetEffectHits[spellID] = groundTargetEffectHits[spellID] or {}
+    groundTargetEffectHits[spellID][destGUID] = true
+end
+
+local function GroundTargetSpellHitCount(spellID)
+    local hits = groundTargetEffectHits[spellID]
+    if not hits then return 0 end
+    local count = 0
+    for _ in pairs(hits) do count = count + 1 end
+    return count
 end
 
 function RaynnaRotationHelperInstallGroundTargetHooks()
@@ -515,11 +551,21 @@ local hostileCombatLogEvents = {
 }
 
 local function TrackCombatLogHostileAttacker(...)
-    local timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID
+    local timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID
     if CombatLogGetCurrentEventInfo then
-        timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID = CombatLogGetCurrentEventInfo()
+        timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID = CombatLogGetCurrentEventInfo()
     else
-        timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID = ...
+        timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellID = ...
+    end
+    if subevent == "UNIT_DIED" or subevent == "UNIT_DESTROYED" or subevent == "PARTY_KILL" then
+        if destGUID then
+            recentHostileAttackers[destGUID] = nil
+            recentMeleeAttackers[destGUID] = nil
+        end
+        return
+    end
+    if subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" then
+        TrackGroundTargetSpellHit(sourceGUID, destGUID, spellID)
     end
     if not hostileCombatLogEvents[subevent] then
         return
@@ -3744,8 +3790,18 @@ local function GroundAoeInfo(spellID)
     if not SettingEnabled("groundAoeIndicator") then
         return nil
     end
+    local targeting = false
+    local active = false
     if not spellID then
         spellID = RaynnaRotationHelperActiveGroundTargetSpellID()
+        targeting = spellID and IsGroundTargetingSpell(spellID) or false
+    end
+    if not spellID then
+        local activeSpellID = ActiveGroundTargetEffectSpellID()
+        if activeSpellID then
+            spellID = activeSpellID
+            active = true
+        end
     end
     if not spellID then
         local recommendations = { ComputeRecommendations() }
@@ -3759,20 +3815,30 @@ local function GroundAoeInfo(spellID)
     if not IsGroundTargetSpell(spellID) then
         return nil
     end
+    targeting = targeting or IsGroundTargetingSpell(spellID)
+    active = active or GroundTargetEffectRemaining(spellID) > 0
+
     local ctx = BuildContext()
     local targetCount = ctx.clusteredEnemyCount and ctx.clusteredEnemyCount(12) or 0
-    local selfCount = ctx.nearbyEnemyCount and ctx.nearbyEnemyCount(10) or 0
+    local nearbyCount = ctx.nearbyEnemyCount and ctx.nearbyEnemyCount(10) or 0
     local fallbackCount = ctx.enemyCount and ctx.enemyCount() or 0
     fallbackCount = math.max(fallbackCount, CountRecentHostileAttackers(GetTime()))
     if fallbackCount == 0 and ctx.hasAttackTarget and ctx.hasAttackTarget() then fallbackCount = 1 end
     if fallbackCount == 0 and UnitExists and UnitExists("target") and UnitCanAttack("player", "target") then fallbackCount = 1 end
     if fallbackCount == 0 and UnitExists and UnitExists("mouseover") and UnitCanAttack("player", "mouseover") then fallbackCount = 1 end
     if fallbackCount == 0 and UnitAffectingCombat and UnitAffectingCombat("player") then fallbackCount = 1 end
-    local count = math.max(targetCount, selfCount, fallbackCount)
-    local place = "PACK"
-    if selfCount > targetCount and selfCount >= fallbackCount then
-        count = selfCount
-        place = "SELF"
+
+    local count = math.max(targetCount, fallbackCount)
+    if count == 0 then
+        count = nearbyCount
+    end
+    local label = "TARGETS"
+    if active then
+        local hitCount = GroundTargetSpellHitCount(spellID)
+        if hitCount > 0 then
+            count = hitCount
+            label = "HIT"
+        end
     end
 
     local quality = "BAD"
@@ -3784,7 +3850,7 @@ local function GroundAoeInfo(spellID)
         quality = "OK"
     end
 
-    return quality, count, place, IsGroundTargetingSpell(spellID)
+    return quality, count, label, targeting, active
 end
 
 local function GroundTargetPlacementLabel(spellID)
@@ -3793,9 +3859,9 @@ local function GroundTargetPlacementLabel(spellID)
         return nil
     end
     if targeting then
-        return "PLACE\n" .. place .. " " .. tostring(count)
+        return "PLACE\n" .. tostring(count) .. " " .. place
     end
-    return place .. " " .. tostring(count)
+    return tostring(count) .. " " .. place
 end
 
 function _G.RaynnaRotationHelperGetGroundAoeQuality()
@@ -3809,9 +3875,9 @@ function _G.RaynnaRotationHelperGetGroundAoeLabel()
         return ""
     end
     if targeting then
-        return place .. "\n" .. tostring(count)
+        return tostring(count) .. "\n" .. place
     end
-    return place .. "\n" .. tostring(count)
+    return tostring(count) .. "\n" .. place
 end
 
 function _G.RaynnaRotationHelperGetSpellLabel(spellID)
