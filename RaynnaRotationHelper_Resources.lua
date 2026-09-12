@@ -16,6 +16,9 @@ function(event, ...)
         return false
     end
     local count, maxCount = _G.RaynnaRotationHelperGetResourceInfo()
+    if _G.RaynnaRotationHelperResourceSlotVisible and _G.RaynnaRotationHelperResourceSlotVisible(%%INDEX%%, count, maxCount) then
+        return true
+    end
     if not maxCount or maxCount < %%INDEX%% then
         return false
     end
@@ -64,8 +67,12 @@ local function GenericLoad()
     return { use_petbattle = false, use_vehicleUi = false, use_never = false, class = { multi = {} }, class_and_spec = { multi = {} }, talent = { multi = {} }, spec = { multi = {} }, size = { multi = {} } }
 end
 
-local function ResourceXOffset(index)
-    return (index - 3) * 20
+local RESOURCE_SLOT_SPACING = 20
+local RESOURCE_SLOT_RIGHT_BIAS = 4
+
+local function ResourceXOffset(index, maxCount)
+    maxCount = maxCount or 5
+    return ((index - ((maxCount + 1) / 2)) * RESOURCE_SLOT_SPACING) + RESOURCE_SLOT_RIGHT_BIAS
 end
 
 local function NoAnimation()
@@ -279,7 +286,29 @@ local function WeakAuraRegion(id)
 end
 
 local RESOURCE_FILL_ALPHA_SPEED = 0.5
+local RESOURCE_FADE_VISIBLE_ALPHA = 0.03
 local resourceFillAlphas = {}
+
+function _G.RaynnaRotationHelperResourceSlotVisible(index, count, maxCount)
+    count = count or 0
+    maxCount = maxCount or 0
+    if maxCount >= index and (UnitExists and UnitExists("target")) then
+        return true
+    end
+    if count >= index then
+        return true
+    end
+    return (resourceFillAlphas[index] or 0) > RESOURCE_FADE_VISIBLE_ALPHA
+end
+
+local function SetRegionXOffset(region, x)
+    if not region then return end
+    if region.SetXOffset then
+        region:SetXOffset(x)
+    elseif region.SetOffset then
+        region:SetOffset(x, 0)
+    end
+end
 
 local function SetTextureColor(region, color)
     if region and color then
@@ -363,6 +392,10 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
         local fill = WeakAuraRegion(RESOURCE_IDS[i])
         local outline = WeakAuraRegion(RESOURCE_OUTLINE_IDS[i])
         local border = WeakAuraRegion(RESOURCE_GCD_IDS[i])
+        local xOffset = ResourceXOffset(i, math.max(maxCount, 1))
+        SetRegionXOffset(fill, xOffset)
+        SetRegionXOffset(outline, xOffset)
+        SetRegionXOffset(border, xOffset)
         local slotActive = maxCount > 0 and i <= maxCount
         local filled = slotActive and i <= count
         local targetAlpha = filled and 1 or 0
