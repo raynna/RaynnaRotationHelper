@@ -37,6 +37,24 @@ local RESOURCE_COLORS = {
     DEMONIC_FURY = { 0.58, 0.12, 0.9, 1 },
 }
 
+local SPRITE_PREFIX = "Interface\\AddOns\\RaynnaRotationHelper\\Media\\Sprites\\"
+local RESOURCE_SPRITES = {
+    COMBO_POINTS = "claw",
+    ARCANE_CHARGES = "arcane-crystal",
+    HOLY_POWER = "hammer",
+    CHI = "dagger",
+    SHADOW_ORBS = "arcane-crystal",
+    SOUL_SHARDS = "arcane-crystal",
+    BURNING_EMBERS = "dagger",
+    DEMONIC_FURY = "dagger",
+    DEFAULT = "dagger",
+}
+
+local function ResourceSprite(resource, filled)
+    local name = RESOURCE_SPRITES[resource or ""] or RESOURCE_SPRITES.DEFAULT
+    return SPRITE_PREFIX .. name .. (filled and "-color.png" or "-gray.png")
+end
+
 local function ResourceColor(resource)
     local color = RESOURCE_COLORS[resource or ""] or { 1, 1, 1, 1 }
     return { color[1], color[2], color[3], color[4] }
@@ -47,7 +65,7 @@ local function GenericLoad()
 end
 
 local function ResourceXOffset(index)
-    return (index - 3) * 11
+    return (index - 3) * 20
 end
 
 local function NoAnimation()
@@ -108,19 +126,19 @@ local function BuildResourceFillAura(parentId, index, forceChild)
         uid = "raynna-rotation-resource-fill-" .. index,
         parent = parentId,
         regionType = "texture",
-        texture = "Interface\\Buttons\\WHITE8X8",
+        texture = ResourceSprite(resource, true),
         textureWrapMode = "CLAMP",
         blendMode = "BLEND",
-        width = 7,
+        width = 22,
         height = 1,
         xOffset = ResourceXOffset(index),
-        yOffset = -14,
+        yOffset = -11,
         anchorPoint = "BOTTOM",
         anchorFrameType = "SCREEN",
         selfPoint = "BOTTOM",
         frameStrata = 4,
         alpha = 0,
-        color = ResourceColor(resource),
+        color = { 1, 1, 1, 1 },
         rotate = false,
         scalex = 1,
         scaley = 1,
@@ -147,16 +165,20 @@ end
 local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
     local childMode = parentId or forceChild
     local id = childMode and RESOURCE_OUTLINE_IDS[index] or TARGET_ID
+    local resource
+    if _G.RaynnaRotationHelperGetResourceInfo then
+        resource = select(3, _G.RaynnaRotationHelperGetResourceInfo())
+    end
     return {
         id = id,
         uid = "raynna-rotation-resource-bg-" .. index,
         parent = parentId,
         regionType = "texture",
-        texture = "Interface\\Buttons\\WHITE8X8",
+        texture = ResourceSprite(resource, false),
         textureWrapMode = "CLAMP",
         blendMode = "BLEND",
-        width = 9,
-        height = 28,
+        width = 22,
+        height = 22,
         xOffset = ResourceXOffset(index),
         yOffset = 0,
         anchorPoint = "CENTER",
@@ -164,7 +186,7 @@ local function BuildResourceBlackOutlineAura(parentId, index, forceChild)
         selfPoint = "CENTER",
         frameStrata = 2,
         alpha = 1,
-        color = { 0.035, 0.04, 0.05, 0.58 },
+        color = { 1, 1, 1, 0.72 },
         scalex = 1,
         scaley = 1,
         internalVersion = 90,
@@ -201,11 +223,11 @@ local function BuildResourceGcdAura(parentId, index, forceChild)
         uid = "raynna-rotation-resource-border-" .. index,
         parent = parentId,
         regionType = "texture",
-        texture = "Interface\\Buttons\\WHITE8X8",
+        texture = "Interface\\Buttons\\UI-ActionButton-Border",
         textureWrapMode = "CLAMP",
         blendMode = "ADD",
-        width = 12,
-        height = 32,
+        width = 34,
+        height = 34,
         xOffset = ResourceXOffset(index),
         yOffset = 0,
         anchorPoint = "CENTER",
@@ -256,9 +278,9 @@ local function WeakAuraRegion(id)
     return _G["WeakAuras:" .. id]
 end
 
-local RESOURCE_FILL_FULL_HEIGHT = 28
+local RESOURCE_FILL_FULL_HEIGHT = 22
 local RESOURCE_FILL_EMPTY_HEIGHT = 0.5
-local RESOURCE_FILL_SPEED = 25
+local RESOURCE_FILL_SPEED = 20
 local resourceFillHeights = {}
 
 local function SetTextureColor(region, color)
@@ -292,7 +314,7 @@ local function EnsureResourceFallbackGlow(region)
     glow:SetBlendMode("ADD")
     glow:SetVertexColor(1, 0.78, 0.12, 0.95)
     glow:SetPoint("CENTER", region, "CENTER", 0, 0)
-    glow:SetSize(42, 42)
+    glow:SetSize(44, 44)
     glow:Hide()
     region.RaynnaResourceGlow = glow
     return glow

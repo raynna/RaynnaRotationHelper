@@ -1498,8 +1498,9 @@ RegisterRotation("PALADIN:2", {
         local avengerTargets = ctx.avengersShieldTargetCount()
         local bossTarget = ctx.targetIsBoss()
         local holyPower = ctx.holyPower()
+        if bossTarget and ctx.ready(31935) then return 31935 end
         if holyPower >= 5 and ctx.ready(53600) then return 53600 end
-        if (bossTarget or avengerTargets >= 2) and ctx.ready(31935) then return 31935 end
+        if avengerTargets >= 2 and ctx.ready(31935) and ctx.inRange(31935) then return 31935 end
         if ctx.targetHpPct() <= 20 and ctx.ready(24275) and ctx.inRange(24275) then return 24275 end
         if enemies >= 2 and ctx.ready(53595) and ctx.inRange(53595) then return 53595 end
         if enemies >= 3 and ctx.ready(26573) then return 26573 end
@@ -2311,7 +2312,6 @@ local function GenericDefensiveRecommendation(ctx)
     if ctx.class == "WARLOCK" then
         if hp <= 45 and ctx.cooldownReady(104773) then return 104773 end
         if hp <= 65 and ctx.cooldownReady(108359) then return 108359 end
-        if UnitExists("pet") and not UnitIsDead("pet") and ctx.unitHpPct("pet") >= 35 and hp <= 50 and ctx.cooldownReady(755) then return 755 end
         return nil
     end
 
@@ -2584,7 +2584,7 @@ local CONTROL_SPELLS_BY_CLASS = {
 }
 
 local function UnitInterruptibleCast(unit)
-    if not UnitExists or not UnitExists(unit) or UnitIsDead(unit) then
+    if not UnitExists or not UnitExists(unit) or UnitIsDead(unit) or not UnitCanAttack("player", unit) then
         return nil
     end
     local name, notInterruptible
@@ -2608,17 +2608,67 @@ local function UnitInterruptibleCast(unit)
     return name
 end
 
-local function FindInterruptibleCastUnit()
-    local units = KnownHostileThreatUnits()
-    for _, unit in ipairs(units) do
-        local name = UnitInterruptibleCast(unit)
-        if name then
-            return unit, name
+local HIGH_PRIORITY_CAST_WORDS = {
+    "heal", "mend", "mending", "renew", "flash", "greater heal", "healing", "regrowth", "rejuvenation", "holy light",
+    "resurrect", "resurrection", "revive", "rebirth", "ancestral spirit",
+    "fear", "howl", "polymorph", "hex", "cyclone", "repentance", "mind control", "psychic scream", "hibernate",
+    "stun", "hammer of justice", "kidney shot", "shockwave", "deep freeze", "frost nova", "ring of frost",
+}
+
+local function InterruptPriority(castName, unit)
+    local score = UnitIsUnit and UnitIsUnit(unit, "target") and 20 or 0
+    if UnitIsPlayer and UnitIsPlayer(unit) then
+        score = score + 8
+    end
+    local lower = tostring(castName or ""):lower()
+    for _, word in ipairs(HIGH_PRIORITY_CAST_WORDS) do
+        if lower:find(word, 1, true) then
+            return score + 100
         end
     end
-    return nil, nil
+    return score + 10
 end
 
+local function AddInterruptUnit(units, seen, unit)
+    if unit and UnitExists(unit) and not UnitIsDead(unit) and UnitCanAttack("player", unit) then
+        local guid = UnitGUID(unit) or unit
+        if not seen[guid] then
+            seen[guid] = true
+            table.insert(units, unit)
+        end
+    end
+end
+
+local function InterruptScanUnits()
+    local units, seen = {}, {}
+    AddInterruptUnit(units, seen, "target")
+    AddInterruptUnit(units, seen, "focus")
+    AddInterruptUnit(units, seen, "mouseover")
+    for i = 1, 5 do AddInterruptUnit(units, seen, "boss" .. i) end
+    for i = 1, 5 do AddInterruptUnit(units, seen, "arena" .. i) end
+    if C_NamePlate and C_NamePlate.GetNamePlates then
+        for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
+            AddInterruptUnit(units, seen, plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit))
+        end
+    end
+    local known = KnownHostileThreatUnits()
+    for _, unit in ipairs(known) do AddInterruptUnit(units, seen, unit) end
+    return units
+end
+
+local function FindInterruptibleCastUnit()
+    local bestUnit, bestName, bestScore
+    for _, unit in ipairs(InterruptScanUnits()) do
+        local name = UnitInterruptibleCast(unit)
+        if name then
+            local score = InterruptPriority(name, unit)
+            if not bestScore or score > bestScore then
+                bestUnit, bestName, bestScore = unit, name, score
+            end
+        end
+    end
+    return bestUnit, bestName
+end
 local function ReadyControlSpellForUnit(ctx, spellIDs, unit)
     if not spellIDs then
         return nil
@@ -3641,9 +3691,15 @@ local function GroundAoeInfo(spellID)
     local ctx = BuildContext()
     local targetCount = ctx.clusteredEnemyCount and ctx.clusteredEnemyCount(12) or 0
     local selfCount = ctx.nearbyEnemyCount and ctx.nearbyEnemyCount(10) or 0
-    local count = targetCount
+    local fallbackCount = ctx.enemyCount and ctx.enemyCount() or 0
+    fallbackCount = math.max(fallbackCount, CountRecentHostileAttackers(GetTime()))
+    if fallbackCount == 0 and ctx.hasAttackTarget and ctx.hasAttackTarget() then fallbackCount = 1 end
+    if fallbackCount == 0 and UnitExists and UnitExists("target") and UnitCanAttack("player", "target") then fallbackCount = 1 end
+    if fallbackCount == 0 and UnitExists and UnitExists("mouseover") and UnitCanAttack("player", "mouseover") then fallbackCount = 1 end
+    if fallbackCount == 0 and UnitAffectingCombat and UnitAffectingCombat("player") then fallbackCount = 1 end
+    local count = math.max(targetCount, selfCount, fallbackCount)
     local place = "PACK"
-    if selfCount > targetCount then
+    if selfCount > targetCount and selfCount >= fallbackCount then
         count = selfCount
         place = "SELF"
     end
@@ -3668,7 +3724,7 @@ local function GroundTargetPlacementLabel(spellID)
     if targeting then
         return "PLACE\n" .. place .. " " .. tostring(count)
     end
-    return quality .. " " .. tostring(count)
+    return place .. " " .. tostring(count)
 end
 
 function _G.RaynnaRotationHelperGetGroundAoeQuality()
@@ -3684,7 +3740,7 @@ function _G.RaynnaRotationHelperGetGroundAoeLabel()
     if targeting then
         return place .. "\n" .. tostring(count)
     end
-    return quality .. "\n" .. tostring(count)
+    return place .. "\n" .. tostring(count)
 end
 
 function _G.RaynnaRotationHelperGetSpellLabel(spellID)
@@ -3923,7 +3979,7 @@ local function CreateOptionsPanel()
         RefreshOptionsPanel()
     end)
     optionsPanel.glowCheck = CreateOptionsCheck(optionsPanel, "Action bar glow", 16, -150, "actionBarGlow")
-    optionsPanel.groundCheck = CreateOptionsCheck(optionsPanel, "Ground AoE quality square", 16, -180, "groundAoeIndicator")
+    optionsPanel.groundCheck = CreateOptionsCheck(optionsPanel, "AoE indicator", 16, -180, "groundAoeIndicator")
     optionsPanel.healCheck = CreateOptionsCheck(optionsPanel, "Highlight lowest visible party/raid frame for healers", 16, -210, "healFrameGlow")
     CreateOptionsButton(optionsPanel, "Open WeakAuras group", 16, -252, 230, function()
         if WeakAuras and WeakAuras.OpenOptions then WeakAuras.OpenOptions(TARGET_ID) elseif WeakAuras and WeakAuras.ToggleOptions then WeakAuras.ToggleOptions() end
