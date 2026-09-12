@@ -1359,10 +1359,10 @@ RegisterRotation("DRUID:2", {
         if ctx.buffRem("player", 1126) <= 0 and ctx.ready(1126) then return 1126 end
         if cp > 0 and srRem <= 3 and ctx.ready(52610, 25) then return 52610 end
         if energy <= 35 and ctx.ready(5217) then return 5217 end
+        if cooldownTarget and inCombat and srRem > 0 and ctx.ready(106951) then return 106951 end
+        if cooldownTarget and inCombat and srRem > 0 and ctx.ready(108288) then return 108288 end
         if cp >= 5 and ripRem <= 2 and ctx.ready(1079, 30) then return 1079 end
         if cp >= 5 and srRem > 6 and ripRem > 8 and rakeRem > 3 and ctx.ready(22568, 25) then return 22568 end
-        if cooldownTarget and inCombat and srRem > 6 and ripRem > 6 and ctx.ready(106951) then return 106951 end
-        if cooldownTarget and inCombat and srRem > 6 and ripRem > 6 and ctx.ready(108288) then return 108288 end
         if enemies >= 2 and thrashRem <= 4 and energy >= 50 and ctx.ready(106830, 50) and ctx.inRange(106830) then return 106830 end
         if rakeRem <= 2 and energy >= 35 and ctx.ready(1822, 35) and ctx.inRange(1822) then return 1822 end
         if enemies >= 3 and thrashRem > 4 and energy >= 45 and ctx.ready(106785, 45) and ctx.inRange(106785) then return 106785 end
