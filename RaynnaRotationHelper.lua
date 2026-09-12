@@ -1361,7 +1361,7 @@ RegisterRotation("DRUID:2", {
         if cp >= 5 and srRem > 6 and ripRem > 8 and rakeRem > 3 and ctx.ready(22568, 25) then return 22568 end
         if meleeEnemies >= 2 and thrashRem <= 4 and energy >= 50 and ctx.ready(106830, 50) and ctx.inRange(106830) then return 106830 end
         if rakeRem <= 2 and energy >= 35 and ctx.ready(1822, 35) and ctx.inRange(1822) then return 1822 end
-        if meleeEnemies >= 3 and thrashRem > 4 and energy >= 45 and ctx.ready(106785, 45) then return 106785 end
+        if meleeEnemies >= 2 and thrashRem > 4 and energy >= 45 and ctx.ready(106785, 45) then return 106785 end
         if thrashRem <= 2 and energy >= 50 and ctx.ready(106830, 50) and ctx.inRange(106830) then return 106830 end
         local behind = ctx.behindTarget()
         local shredReady = energy >= 40 and ctx.ready(5221, 40) and ctx.inRange(5221)
@@ -2995,9 +2995,9 @@ local function GenericUtilityRecommendation(ctx)
         return nil, "no hostile target"
     end
     if ctx.class == "DRUID" then
-        if ctx.spec == 2 and ctx.majorCooldownTarget and ctx.majorCooldownTarget() and UnitAffectingCombat and UnitAffectingCombat("player") and ctx.buffRem("player", 52610, 127538) > 0 then
-            if ctx.ready(106951) then return 106951, "berserk ready" end
-            if ctx.ready(108288) then return 108288, "nature's vigil ready" end
+        if ctx.hasBuff and ctx.hasBuff(768) and ctx.majorCooldownTarget and ctx.majorCooldownTarget() and ctx.buffRem("player", 52610, 127538) > 0 then
+            if ctx.cooldownReady(106951) then return 106951, "berserk ready" end
+            if ctx.cooldownReady(108288) then return 108288, "nature's vigil ready" end
         end
         if ctx.debuffAnyRem("target", false, 770, 113746) <= 0 and ctx.ready(770) and ctx.inRange(770) then
             return 770, "armor debuff missing"
@@ -4167,6 +4167,7 @@ local function PrintActionBarDebug()
     if module and module.name == "Feral Druid" then
         local behind = ctx.behindTarget()
         print("|cff66ccff" .. ADDON_NAME .. ":|r behind target " .. tostring(behind) .. " (" .. (ctx.behindDebug or "no debug") .. ")")
+        print("|cff66ccff" .. ADDON_NAME .. ":|r feral cooldown cat=" .. tostring(ctx.hasBuff and ctx.hasBuff(768) or false) .. " savageRoar=" .. string.format("%.1f", ctx.buffRem("player", 52610, 127538)) .. " major=" .. tostring(ctx.majorCooldownTarget and ctx.majorCooldownTarget() or false) .. " berserkKnown=" .. tostring(ctx.known(106951)) .. " berserkReady=" .. tostring(ctx.cooldownReady(106951)))
     end
     if ctx.class == "HUNTER" then
         local serpentRem = ctx.debuffRem("target", 1978, true)
