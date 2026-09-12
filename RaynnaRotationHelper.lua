@@ -1352,20 +1352,16 @@ RegisterRotation("DRUID:2", {
         local ripRem = ctx.debuffRem("target", 1079, true)
         local rakeRem = ctx.debuffRem("target", 1822, true)
         local thrashRem = ctx.debuffRem("target", 106830, true)
-        local cooldownTarget = ctx.majorCooldownTarget()
-        local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
-        local enemies = ctx.enemyCount()
+        local meleeEnemies = ctx.nearbyEnemyCount(8)
 
         if ctx.buffRem("player", 1126) <= 0 and ctx.ready(1126) then return 1126 end
         if cp > 0 and srRem <= 3 and ctx.ready(52610, 25) then return 52610 end
         if energy <= 35 and ctx.ready(5217) then return 5217 end
-        if cooldownTarget and inCombat and srRem > 0 and ctx.ready(106951) then return 106951 end
-        if cooldownTarget and inCombat and srRem > 0 and ctx.ready(108288) then return 108288 end
         if cp >= 5 and ripRem <= 2 and ctx.ready(1079, 30) then return 1079 end
         if cp >= 5 and srRem > 6 and ripRem > 8 and rakeRem > 3 and ctx.ready(22568, 25) then return 22568 end
-        if enemies >= 2 and thrashRem <= 4 and energy >= 50 and ctx.ready(106830, 50) and ctx.inRange(106830) then return 106830 end
+        if meleeEnemies >= 2 and thrashRem <= 4 and energy >= 50 and ctx.ready(106830, 50) and ctx.inRange(106830) then return 106830 end
         if rakeRem <= 2 and energy >= 35 and ctx.ready(1822, 35) and ctx.inRange(1822) then return 1822 end
-        if enemies >= 3 and thrashRem > 4 and energy >= 45 and ctx.ready(106785, 45) and ctx.inRange(106785) then return 106785 end
+        if meleeEnemies >= 3 and thrashRem > 4 and energy >= 45 and ctx.ready(106785, 45) then return 106785 end
         if thrashRem <= 2 and energy >= 50 and ctx.ready(106830, 50) and ctx.inRange(106830) then return 106830 end
         local behind = ctx.behindTarget()
         local shredReady = energy >= 40 and ctx.ready(5221, 40) and ctx.inRange(5221)
@@ -2999,6 +2995,10 @@ local function GenericUtilityRecommendation(ctx)
         return nil, "no hostile target"
     end
     if ctx.class == "DRUID" then
+        if ctx.spec == 2 and ctx.majorCooldownTarget and ctx.majorCooldownTarget() and UnitAffectingCombat and UnitAffectingCombat("player") and ctx.buffRem("player", 52610, 127538) > 0 then
+            if ctx.ready(106951) then return 106951, "berserk ready" end
+            if ctx.ready(108288) then return 108288, "nature's vigil ready" end
+        end
         if ctx.debuffAnyRem("target", false, 770, 113746) <= 0 and ctx.ready(770) and ctx.inRange(770) then
             return 770, "armor debuff missing"
         end
@@ -3028,7 +3028,7 @@ local function GenericFallbackRecommendation(ctx, module)
     elseif class == "DRUID" then
         local spell
         if ctx.hasBuff and ctx.hasBuff(768) then
-            spell = ctx.readyAnyInRange(33876, 5221, 1822, 106785)
+            spell = ctx.readyAnyInRange(33876, 5221, 1822)
         elseif ctx.hasBuff and ctx.hasBuff(5487) then
             spell = ctx.readyAnyInRange(33917, 6807, 779)
         else
