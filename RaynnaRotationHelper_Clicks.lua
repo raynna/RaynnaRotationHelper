@@ -45,12 +45,17 @@ local function EnsureButton(slot)
 end
 
 local function PositionButton(button, region)
-    if not region or not region.GetWidth or not region.GetHeight then return false end
+    if not region or not region.GetWidth or not region.GetHeight or not region.GetCenter then return false end
     local width = region:GetWidth() or 0
     local height = region:GetHeight() or 0
-    if width <= 0 or height <= 0 then return false end
+    local x, y = region:GetCenter()
+    if width <= 0 or height <= 0 or not x or not y then return false end
+    local scale = 1
+    if region.GetEffectiveScale and UIParent.GetEffectiveScale then
+        scale = region:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    end
     button:ClearAllPoints()
-    button:SetPoint("CENTER", region, "CENTER", 0, 0)
+    button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x * scale, y * scale)
     button:SetSize(width, height)
     return true
 end
