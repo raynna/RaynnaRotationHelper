@@ -278,7 +278,7 @@ local function WeakAuraRegion(id)
     return _G["WeakAuras:" .. id]
 end
 
-local RESOURCE_FILL_ALPHA_SPEED = 1.35
+local RESOURCE_FILL_ALPHA_SPEED = 0.5
 local resourceFillAlphas = {}
 
 local function SetTextureColor(region, color)
@@ -367,7 +367,7 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
         local filled = slotActive and i <= count
         local targetAlpha = filled and 1 or 0
         local current = resourceFillAlphas[i]
-        if current == nil then current = targetAlpha end
+        if current == nil then current = 0 end
         local step = RESOURCE_FILL_ALPHA_SPEED * elapsed
         if current < targetAlpha then
             current = math.min(targetAlpha, current + step)
