@@ -2922,32 +2922,85 @@ local function ComputeResourceInfo()
     if not module then
         return 0, 0, nil, nil
     end
+
     if module.resource == "COMBO_POINTS" then
+        if not GetComboPoints or not ctx.hasAttackTarget() then
+            return 0, 0, nil, nil
+        end
+        if ctx.class == "DRUID" and not (ctx.known(768) or ctx.known(1822) or ctx.known(33876) or ctx.known(5221)) then
+            return 0, 0, nil, nil
+        end
+        if ctx.class == "ROGUE" and not (ctx.known(1752) or ctx.known(2098) or ctx.known(53) or ctx.known(8676)) then
+            return 0, 0, nil, nil
+        end
         return GetComboPoints("player", "target") or 0, 5, module.resource, 132127
     end
+
     if module.resource == "ARCANE_CHARGES" then
-        return ctx.arcaneCharges(), ctx.arcaneChargesMax(), module.resource, 135734, ctx.arcaneChargeRemaining()
+        local powerType = SPELL_POWER_ARCANE_CHARGES or (Enum and Enum.PowerType and Enum.PowerType.ArcaneCharges) or 16
+        local rawMax = UnitPowerMax and UnitPowerMax("player", powerType) or 0
+        local charges = ctx.arcaneCharges()
+        if rawMax <= 0 and charges <= 0 and not ctx.known(30451) then
+            return 0, 0, nil, nil
+        end
+        return charges, math.max(rawMax or 0, 4), module.resource, 135734, ctx.arcaneChargeRemaining()
     end
+
     if module.resource == "HOLY_POWER" then
-        return ctx.holyPower(), ctx.holyPowerMax(), module.resource, 135920
+        local count = ctx.holyPower()
+        local rawMax = ctx.powerMax(ctx.holyPowerType)
+        if rawMax <= 0 and count <= 0 then
+            return 0, 0, nil, nil
+        end
+        return count, math.max(rawMax or 0, 5), module.resource, 135920
     end
+
     if module.resource == "CHI" then
-        return ctx.chi(), ctx.chiMax(), module.resource, 606552
+        local count = ctx.chi()
+        local rawMax = ctx.powerMax(ctx.chiType)
+        if rawMax <= 0 and count <= 0 then
+            return 0, 0, nil, nil
+        end
+        return count, math.max(rawMax or 0, 4), module.resource, 606552
     end
+
     if module.resource == "SHADOW_ORBS" then
-        return ctx.shadowOrbs(), 3, module.resource, 136224
+        local count = ctx.shadowOrbs()
+        local rawMax = ctx.powerMax(ctx.shadowOrbType)
+        if rawMax <= 0 and count <= 0 then
+            return 0, 0, nil, nil
+        end
+        return count, math.max(rawMax or 0, 3), module.resource, 136224
     end
+
     if module.resource == "SOUL_SHARDS" then
-        return ctx.soulShards(), 4, module.resource, 538443
+        local count = ctx.soulShards()
+        local rawMax = ctx.powerMax(ctx.soulShardType)
+        if rawMax <= 0 and count <= 0 then
+            return 0, 0, nil, nil
+        end
+        return count, math.max(rawMax or 0, 4), module.resource, 538443
     end
+
     if module.resource == "BURNING_EMBERS" then
+        local raw = ctx.burningEmbersRaw()
+        local rawMax = ctx.powerMax(ctx.burningEmberType)
+        if rawMax <= 0 and raw <= 0 then
+            return 0, 0, nil, nil
+        end
         return math.floor(ctx.burningEmbers()), math.floor(ctx.burningEmbersMax()), module.resource, 460700
     end
+
     if module.resource == "DEMONIC_FURY" then
-        local maxFury = ctx.demonicFuryMax()
-        return math.floor((ctx.demonicFury() / maxFury) * 4 + 0.0001), 4, module.resource, 136172
+        local count = ctx.demonicFury()
+        local rawMax = ctx.powerMax(ctx.demonicFuryType)
+        if rawMax <= 0 and count <= 0 then
+            return 0, 0, nil, nil
+        end
+        return math.floor((count / math.max(rawMax, 1)) * 4 + 0.0001), 4, module.resource, 136172
     end
-    return 0, 0, module.resource, nil
+
+    return 0, 0, nil, nil
 end
 
 function _G.RaynnaRotationHelperGetRecommendation(slot)

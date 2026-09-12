@@ -2,7 +2,7 @@
 ## Title: Raynna Rotation Helper
 ## Notes: Spec-module rotation helper with a single next-action icon and action bar glow.
 ## Author: Raynna
-## Version: 1.0.50
+## Version: 1.0.51
 ## DefaultState: Enabled
 ## RequiredDeps: WeakAuras
 ## SavedVariables: RaynnaRotationHelperDB

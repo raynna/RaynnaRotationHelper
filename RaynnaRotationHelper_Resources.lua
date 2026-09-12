@@ -52,7 +52,7 @@ local RESOURCE_SPRITES = {
 
 local function ResourceSprite(resource, filled)
     local name = RESOURCE_SPRITES[resource or ""] or RESOURCE_SPRITES.DEFAULT
-    return SPRITE_PREFIX .. name .. (filled and "-color.png" or "-gray.png")
+    return SPRITE_PREFIX .. name .. (filled and "-filled-color.png" or "-outline-color.png")
 end
 
 local function ResourceColor(resource)
@@ -130,12 +130,12 @@ local function BuildResourceFillAura(parentId, index, forceChild)
         textureWrapMode = "CLAMP",
         blendMode = "BLEND",
         width = 22,
-        height = 1,
+        height = 22,
         xOffset = ResourceXOffset(index),
-        yOffset = -11,
-        anchorPoint = "BOTTOM",
+        yOffset = 0,
+        anchorPoint = "CENTER",
         anchorFrameType = "SCREEN",
-        selfPoint = "BOTTOM",
+        selfPoint = "CENTER",
         frameStrata = 4,
         alpha = 0,
         color = { 1, 1, 1, 1 },
@@ -278,10 +278,8 @@ local function WeakAuraRegion(id)
     return _G["WeakAuras:" .. id]
 end
 
-local RESOURCE_FILL_FULL_HEIGHT = 22
-local RESOURCE_FILL_EMPTY_HEIGHT = 0.5
-local RESOURCE_FILL_SPEED = 20
-local resourceFillHeights = {}
+local RESOURCE_FILL_ALPHA_SPEED = 5.5
+local resourceFillAlphas = {}
 
 local function SetTextureColor(region, color)
     if region and color then
@@ -290,6 +288,16 @@ local function SetTextureColor(region, color)
         elseif region.texture and region.texture.SetVertexColor then
             region.texture:SetVertexColor(color[1], color[2], color[3], color[4])
         end
+    end
+end
+
+local function SetRegionTexture(region, texture)
+    if not region or not texture then return end
+    if region.SetTexture then
+        pcall(region.SetTexture, region, texture)
+    end
+    if region.texture and region.texture.SetTexture then
+        pcall(region.texture.SetTexture, region.texture, texture)
     end
 end
 
@@ -356,42 +364,50 @@ function _G.RaynnaRotationHelperUpdateResourceVisuals(elapsed)
     elapsed = elapsed or 0.05
     local now = GetTime and GetTime() or 0
 
-    local baseColor = ResourceColor(resource)
     local borderColor = ResourceColor(resource)
     borderColor[4] = 0.32
 
     for i = 1, #RESOURCE_IDS do
         local fill = WeakAuraRegion(RESOURCE_IDS[i])
-        local target = (i <= count) and RESOURCE_FILL_FULL_HEIGHT or RESOURCE_FILL_EMPTY_HEIGHT
-        local current = resourceFillHeights[i]
-        if current == nil then current = RESOURCE_FILL_EMPTY_HEIGHT end
-        local step = RESOURCE_FILL_SPEED * elapsed
-        if current < target then
-            current = math.min(target, current + step)
-        elseif current > target then
-            current = math.max(target, current - step)
+        local outline = WeakAuraRegion(RESOURCE_OUTLINE_IDS[i])
+        local border = WeakAuraRegion(RESOURCE_GCD_IDS[i])
+        local slotActive = maxCount > 0 and i <= maxCount
+        local filled = slotActive and i <= count
+        local targetAlpha = filled and 1 or 0
+        local current = resourceFillAlphas[i]
+        if current == nil then current = targetAlpha end
+        local step = RESOURCE_FILL_ALPHA_SPEED * elapsed
+        if current < targetAlpha then
+            current = math.min(targetAlpha, current + step)
+        elseif current > targetAlpha then
+            current = math.max(targetAlpha, current - step)
         end
-        resourceFillHeights[i] = current
+        resourceFillAlphas[i] = current
 
         if fill then
-            SetResourceFillHeight(fill, current)
+            SetRegionTexture(fill, ResourceSprite(resource, true))
             if fill.SetAlpha then
-                local alpha = current <= RESOURCE_FILL_EMPTY_HEIGHT + 0.01 and 0 or 1
-                if resource == "ARCANE_CHARGES" and remaining and remaining ~= math.huge and remaining <= 4 and i <= count then
-                    alpha = math.max(0.5, 0.55 + 0.45 * math.abs(math.sin(now * 4)))
+                local alpha = slotActive and current or 0
+                if resource == "ARCANE_CHARGES" and remaining and remaining ~= math.huge and remaining <= 4 and filled then
+                    alpha = math.max(0.5, alpha * (0.65 + 0.35 * math.abs(math.sin(now * 4))))
                 end
                 fill:SetAlpha(alpha)
             end
-            baseColor[4] = 1
-            SetTextureColor(fill, baseColor)
+            SetTextureColor(fill, { 1, 1, 1, 1 })
         end
 
-        local border = WeakAuraRegion(RESOURCE_GCD_IDS[i])
+        if outline then
+            SetRegionTexture(outline, ResourceSprite(resource, false))
+            if outline.SetAlpha then outline:SetAlpha(slotActive and 0.9 or 0) end
+            SetTextureColor(outline, { 1, 1, 1, 0.9 })
+        end
+
         if border then
-            if maxCount > 0 and count >= maxCount and i <= maxCount then
+            if slotActive and count >= maxCount then
                 SetTextureColor(border, { 1, 0.82, 0.18, 0.95 })
                 ShowResourceGlow(border)
             else
+                borderColor[4] = slotActive and 0.32 or 0
                 SetTextureColor(border, borderColor)
                 HideResourceGlow(border)
             end
