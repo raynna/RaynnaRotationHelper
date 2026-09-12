@@ -760,6 +760,42 @@ local function BuildContext()
         return duration <= 1.5 or start + duration - now <= 0.1
     end
 
+    function ctx.cooldownReadyByName(spellName)
+        if not spellName or not GetSpellInfo or not GetSpellInfo(spellName) then
+            return false
+        end
+        local usable = IsUsableSpell and IsUsableSpell(spellName)
+        if usable == false then
+            return false
+        end
+        local start, duration, enabled = GetSpellCooldown(spellName)
+        duration = duration or 0
+        start = start or 0
+        if enabled == 0 then
+            return false
+        end
+        return duration <= 1.5 or start + duration - now <= 0.1
+    end
+
+    function ctx.readySpellOrName(nameFallback, ...)
+        for i = 1, select("#", ...) do
+            local spellID = select(i, ...)
+            if ctx.cooldownReady(spellID) then
+                return spellID
+            end
+        end
+        local spellName = nameFallback
+        if not spellName or spellName == "" then
+            for i = 1, select("#", ...) do
+                spellName = GetSpellInfo(select(i, ...))
+                if spellName then break end
+            end
+        end
+        if spellName and ctx.cooldownReadyByName(spellName) then
+            return spellName
+        end
+        return nil
+    end
     function ctx.buffRem(unit, ...)
         local best = 0
         for i = 1, select("#", ...) do
@@ -2996,7 +3032,8 @@ local function GenericUtilityRecommendation(ctx)
     end
     if ctx.class == "DRUID" then
         if ctx.hasBuff and ctx.hasBuff(768) and ctx.majorCooldownTarget and ctx.majorCooldownTarget() and ctx.buffRem("player", 52610, 127538) > 0 then
-            if ctx.cooldownReady(106951) then return 106951, "berserk ready" end
+            local berserk = ctx.readySpellOrName("Berserk", 106951, 50334)
+            if berserk then return berserk, "berserk ready" end
             if ctx.cooldownReady(108288) then return 108288, "nature's vigil ready" end
         end
         if ctx.debuffAnyRem("target", false, 770, 113746) <= 0 and ctx.ready(770) and ctx.inRange(770) then
@@ -4167,7 +4204,7 @@ local function PrintActionBarDebug()
     if module and module.name == "Feral Druid" then
         local behind = ctx.behindTarget()
         print("|cff66ccff" .. ADDON_NAME .. ":|r behind target " .. tostring(behind) .. " (" .. (ctx.behindDebug or "no debug") .. ")")
-        print("|cff66ccff" .. ADDON_NAME .. ":|r feral cooldown cat=" .. tostring(ctx.hasBuff and ctx.hasBuff(768) or false) .. " savageRoar=" .. string.format("%.1f", ctx.buffRem("player", 52610, 127538)) .. " major=" .. tostring(ctx.majorCooldownTarget and ctx.majorCooldownTarget() or false) .. " berserkKnown=" .. tostring(ctx.known(106951)) .. " berserkReady=" .. tostring(ctx.cooldownReady(106951)))
+        print("|cff66ccff" .. ADDON_NAME .. ":|r feral cooldown cat=" .. tostring(ctx.hasBuff and ctx.hasBuff(768) or false) .. " savageRoar=" .. string.format("%.1f", ctx.buffRem("player", 52610, 127538)) .. " major=" .. tostring(ctx.majorCooldownTarget and ctx.majorCooldownTarget() or false) .. " berserkKnown=" .. tostring(ctx.known(106951) or ctx.known(50334)) .. " berserkReady=" .. tostring(ctx.readySpellOrName("Berserk", 106951, 50334) ~= nil))
     end
     if ctx.class == "HUNTER" then
         local serpentRem = ctx.debuffRem("target", 1978, true)
