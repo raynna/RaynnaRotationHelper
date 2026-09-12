@@ -1555,12 +1555,27 @@ function RaynnaRotationHelperRememberPaladinSealSpell(spellID, spellName, source
         return nil
     end
     local matched = MatchPaladinSeal(spellID, spellName or (spellID and GetSpellInfo(spellID)))
-    if matched then
-        _G.RaynnaRotationHelperLastPaladinSealID = matched
-        GetDB().paladinSealSpellID = matched
+    if not matched then
+        return nil
+    end
+
+    local now = GetTime and GetTime() or 0
+    if _G.RaynnaRotationHelperLastSealCastID == matched and now - (_G.RaynnaRotationHelperLastSealCastAt or 0) < 0.45 then
         return matched
     end
-    return nil
+    _G.RaynnaRotationHelperLastSealCastID = matched
+    _G.RaynnaRotationHelperLastSealCastAt = now
+
+    local current = _G.RaynnaRotationHelperLastPaladinSealID or GetDB().paladinSealSpellID
+    if current == matched then
+        _G.RaynnaRotationHelperLastPaladinSealID = nil
+        GetDB().paladinSealSpellID = nil
+        return matched
+    end
+
+    _G.RaynnaRotationHelperLastPaladinSealID = matched
+    GetDB().paladinSealSpellID = matched
+    return matched
 end
 
 function RaynnaRotationHelperTrackPaladinSealCast(unit, ...)
@@ -4071,7 +4086,7 @@ function RaynnaRotationHelperPrintSealDebug()
     local ctx = BuildContext()
     local remembered = _G.RaynnaRotationHelperLastPaladinSealID or GetDB().paladinSealSpellID
     local active = ActivePaladinSealSpellID()
-    print("|cff66ccff" .. ADDON_NAME .. ":|r seal debug class=" .. tostring(ctx.class) .. " spec=" .. tostring(ctx.spec) .. " active=" .. tostring(active) .. " remembered=" .. tostring(remembered))
+    print("|cff66ccff" .. ADDON_NAME .. ":|r seal debug class=" .. tostring(ctx.class) .. " spec=" .. tostring(ctx.spec) .. " active=" .. tostring(active) .. " remembered=" .. tostring(remembered) .. " lastCast=" .. tostring(_G.RaynnaRotationHelperLastSealCastID) .. " lastCastAt=" .. tostring(_G.RaynnaRotationHelperLastSealCastAt))
     for _, sealID in ipairs(PALADIN_SEALS) do
         local name = GetSpellInfo(sealID) or ("spell " .. tostring(sealID))
         local buffRem = ctx.buffRem and ctx.buffRem("player", sealID) or 0
