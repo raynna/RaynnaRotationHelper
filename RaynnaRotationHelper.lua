@@ -1669,7 +1669,8 @@ RegisterRotation("PALADIN:2", {
         return ctx.class == "PALADIN" and (ctx.spec == 2 or ctx.hasBuff(25780) or ctx.known(31935))
     end,
     recommend = function(ctx)
-        if ctx.known(25780) and ctx.buffRem("player", 25780) <= 0 and ctx.ready(25780) then return 25780 end        if not ctx.hasAttackTarget() then return nil end
+        if ctx.known(25780) and ctx.buffRem("player", 25780) <= 0 and ctx.ready(25780) then return 25780 end
+        if not ctx.hasAttackTarget() then return nil end
 
         local enemies = ctx.enemyCount()
         local avengerTargets = ctx.avengersShieldTargetCount()
@@ -4066,6 +4067,53 @@ local function UpdateActionBarGlow()
     end)
 end
 
+function RaynnaRotationHelperPrintSealDebug()
+    local ctx = BuildContext()
+    local remembered = _G.RaynnaRotationHelperLastPaladinSealID or GetDB().paladinSealSpellID
+    local active = ActivePaladinSealSpellID()
+    print("|cff66ccff" .. ADDON_NAME .. ":|r seal debug class=" .. tostring(ctx.class) .. " spec=" .. tostring(ctx.spec) .. " active=" .. tostring(active) .. " remembered=" .. tostring(remembered))
+    for _, sealID in ipairs(PALADIN_SEALS) do
+        local name = GetSpellInfo(sealID) or ("spell " .. tostring(sealID))
+        local buffRem = ctx.buffRem and ctx.buffRem("player", sealID) or 0
+        local currentSpell = IsCurrentSpell and IsCurrentSpell(sealID) or false
+        print("|cff66ccff" .. ADDON_NAME .. ":|r seal " .. tostring(name) .. " id=" .. tostring(sealID) .. " known=" .. tostring(ctx.known and ctx.known(sealID)) .. " ready=" .. tostring(ctx.ready and ctx.ready(sealID)) .. " buffRem=" .. tostring(buffRem) .. " isCurrentSpell=" .. tostring(currentSpell))
+    end
+    if GetNumShapeshiftForms and GetShapeshiftFormInfo then
+        local forms = GetNumShapeshiftForms() or 0
+        print("|cff66ccff" .. ADDON_NAME .. ":|r shapeshift forms=" .. tostring(forms) .. " current=" .. tostring(GetShapeshiftForm and GetShapeshiftForm() or "no api"))
+        for i = 1, forms do
+            local icon, name, activeFlag, castable, spellID = GetShapeshiftFormInfo(i)
+            print("|cff66ccff" .. ADDON_NAME .. ":|r form " .. tostring(i) .. " name=" .. tostring(name) .. " spell=" .. tostring(spellID) .. " active=" .. tostring(activeFlag) .. " castable=" .. tostring(castable))
+        end
+    else
+        print("|cff66ccff" .. ADDON_NAME .. ":|r shapeshift api unavailable")
+    end
+    for i = 1, 10 do
+        local button = _G and _G["StanceButton" .. i]
+        local slot = button and button.action
+        if slot then
+            local actionType, id, subType = GetActionInfo and GetActionInfo(slot)
+            local name = id and GetSpellInfo(id) or (GetActionText and GetActionText(slot))
+            print("|cff66ccff" .. ADDON_NAME .. ":|r stanceButton" .. tostring(i) .. " slot=" .. tostring(slot) .. " type=" .. tostring(actionType) .. " id=" .. tostring(id) .. " sub=" .. tostring(subType) .. " name=" .. tostring(name) .. " current=" .. tostring(IsCurrentAction and IsCurrentAction(slot)))
+        end
+    end
+    local found = 0
+    if GetActionInfo then
+        for slot = 1, 180 do
+            local actionType, id, subType = GetActionInfo(slot)
+            local name = id and GetSpellInfo(id) or (GetActionText and GetActionText(slot))
+            local lowerName = type(name) == "string" and string.lower(name) or nil
+            if actionType or (lowerName and string.find(lowerName, "seal", 1, true)) then
+                local matched = MatchPaladinSeal(id, name)
+                if matched or (IsCurrentAction and IsCurrentAction(slot)) then
+                    found = found + 1
+                    print("|cff66ccff" .. ADDON_NAME .. ":|r actionSlot " .. tostring(slot) .. " type=" .. tostring(actionType) .. " id=" .. tostring(id) .. " sub=" .. tostring(subType) .. " name=" .. tostring(name) .. " matchedSeal=" .. tostring(matched) .. " current=" .. tostring(IsCurrentAction and IsCurrentAction(slot)))
+                end
+            end
+        end
+    end
+    print("|cff66ccff" .. ADDON_NAME .. ":|r seal debug action matches=" .. tostring(found))
+end
 local function PrintActionBarDebug()
     local ctx = BuildContext()
     local module = ActiveRotation(ctx)
@@ -4288,6 +4336,16 @@ SlashCmdList.RAYNNAROTATIONHELPER = function(msg)
         PrintActionBarDebug()
         return
     end
+    if msg == "sealdebug" or msg == "seal" then
+        RaynnaRotationHelperPrintSealDebug()
+        return
+    end
+    if msg == "sealclear" then
+        _G.RaynnaRotationHelperLastPaladinSealID = nil
+        GetDB().paladinSealSpellID = nil
+        print("|cff66ccff" .. ADDON_NAME .. ":|r remembered paladin seal cleared")
+        return
+    end
     if msg == "settings" or msg == "options" then
         OpenOptionsPanel()
         return
@@ -4323,7 +4381,7 @@ SlashCmdList.RAYNNAROTATIONHELPER = function(msg)
         return
     end
     if msg == "help" or msg == "?" then
-        print("|cff66ccff" .. ADDON_NAME .. ":|r /rrh debug, /rrh settings, /rrh unlock, /rrh mode auto|boss|trash, /rrh pet auto|dungeon|solo|off")
+        print("|cff66ccff" .. ADDON_NAME .. ":|r /rrh debug, /rrh sealdebug, /rrh sealclear, /rrh settings, /rrh unlock, /rrh mode auto|boss|trash, /rrh pet auto|dungeon|solo|off")
         return
     end
     Install()
