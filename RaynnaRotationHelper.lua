@@ -1511,18 +1511,57 @@ local PALADIN_SEALS = { 31801, 20165, 20154, 20164, 20166 }
 local PALADIN_SEAL_IDS = {}
 for _, sealID in ipairs(PALADIN_SEALS) do PALADIN_SEAL_IDS[sealID] = true end
 
+local function MatchPaladinSeal(spellID, name)
+    if spellID and PALADIN_SEAL_IDS[spellID] then
+        return spellID
+    end
+    if type(name) ~= "string" then
+        return nil
+    end
+    local lower = string.lower(name)
+    if string.find(lower, "seal", 1, true) then
+        return spellID or 0
+    end
+    for _, sealID in ipairs(PALADIN_SEALS) do
+        local sealName = GetSpellInfo(sealID)
+        if sealName and sealName == name then
+            return sealID
+        end
+    end
+    return nil
+end
+
+local function CurrentPaladinSealAction(slot)
+    if not slot or not IsCurrentAction or not IsCurrentAction(slot) then
+        return nil
+    end
+    local actionType, id = GetActionInfo and GetActionInfo(slot)
+    if actionType == "spell" then
+        local matched = MatchPaladinSeal(id, GetSpellInfo(id))
+        if matched then return matched end
+    end
+    if GetActionText then
+        local matched = MatchPaladinSeal(nil, GetActionText(slot))
+        if matched then return matched end
+    end
+    return nil
+end
+
 local function ActivePaladinSealSpellID()
+    if IsCurrentSpell then
+        for _, sealID in ipairs(PALADIN_SEALS) do
+            if IsCurrentSpell(sealID) then
+                return sealID
+            end
+        end
+    end
     if GetNumShapeshiftForms and GetShapeshiftFormInfo then
         local forms = GetNumShapeshiftForms() or 0
         for i = 1, forms do
             local _, name, active, _, spellID = GetShapeshiftFormInfo(i)
             if active then
-                if spellID and PALADIN_SEAL_IDS[spellID] then
-                    return spellID
-                end
-                if type(name) == "string" and string.find(string.lower(name), "seal", 1, true) then
-                    return spellID or 0
-                end
+                local matched = MatchPaladinSeal(spellID, name)
+                if matched then return matched end
             end
         end
     end
@@ -1530,13 +1569,18 @@ local function ActivePaladinSealSpellID()
         local index = GetShapeshiftForm()
         if index and index > 0 then
             local _, name, _, _, spellID = GetShapeshiftFormInfo(index)
-            if spellID and PALADIN_SEAL_IDS[spellID] then
-                return spellID
-            end
-            if type(name) == "string" and string.find(string.lower(name), "seal", 1, true) then
-                return spellID or 0
-            end
+            local matched = MatchPaladinSeal(spellID, name)
+            if matched then return matched end
         end
+    end
+    for i = 1, 10 do
+        local button = _G and _G["StanceButton" .. i]
+        local matched = CurrentPaladinSealAction(button and button.action)
+        if matched then return matched end
+    end
+    for slot = 1, 180 do
+        local matched = CurrentPaladinSealAction(slot)
+        if matched then return matched end
     end
     return nil
 end
@@ -1566,7 +1610,8 @@ RegisterRotation("PALADIN:1", {
     enabled = function(ctx)
         return ctx.class == "PALADIN" and ctx.spec == 1
     end,
-    recommend = function(ctx)        local unit = ctx.healUnit()
+    recommend = function(ctx)
+        local unit = ctx.healUnit()
         local hp = ctx.unitHpPct(unit)
         local holyPower = ctx.holyPower()
         if hp < 95 and holyPower >= 3 and ctx.ready(114163) then return 114163 end
@@ -1616,7 +1661,8 @@ RegisterRotation("PALADIN:3", {
     enabled = function(ctx)
         return ctx.class == "PALADIN" and (ctx.spec == 3 or ctx.spec == nil)
     end,
-    recommend = function(ctx)        if ctx.known(20217) and ctx.buffRem("player", 20217, 19740) <= 0 and ctx.ready(20217) then return 20217 end
+    recommend = function(ctx)
+        if ctx.known(20217) and ctx.buffRem("player", 20217, 19740) <= 0 and ctx.ready(20217) then return 20217 end
         if ctx.known(19740) and ctx.buffRem("player", 20217, 19740) <= 0 and ctx.ready(19740) then return 19740 end
         if not ctx.hasAttackTarget() then return nil end
 
