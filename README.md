@@ -1,3 +1,9 @@
+# Forever port
+
+The `codex/forever-port` branch adds a WoW Forever beta using the ForeverAuras fork alongside the original MoP implementation. See [FOREVER.md](FOREVER.md) for installation, features and limitations. The generic TOC loads only `Forever/`; the Mists-specific TOC and original Lua files are unchanged.
+
+---
+
 # Raynna Rotation Helper
 
 Raynna Rotation Helper is a World of Warcraft Mists of Pandaria Classic addon that drives a generated WeakAuras rotation helper.

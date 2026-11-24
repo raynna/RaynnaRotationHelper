@@ -1,0 +1,19 @@
+## Interface: 16001
+## IconTexture: Interface\AddOns\RaynnaRotationHelper\AddonIcon
+## Title: Raynna's Rotation Helper
+## Notes: Forever spell priorities, readable-data recommendations and resource display.
+## Author: Raynna
+## Version: 2.0.0-forever-beta11
+## RequiredDeps: ForeverAuras
+## SavedVariablesPerCharacter: RaynnaRotationHelperForeverDB
+
+Forever\SettingsRegistry.lua
+Forever\Client.lua
+Forever\Auras.lua
+Forever\Talents.lua
+Forever\Rotations.lua
+Forever\UpdatedRotations.lua
+Forever\Engine.lua
+Forever\UI.lua
+Forever\AuraDisplay.lua
+Forever\Core.lua
